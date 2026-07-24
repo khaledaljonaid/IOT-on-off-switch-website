@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ESP32 Control</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.js"></script>
+</head>
+<body>
+    <header>
+        <div class="logo"><img style="width: 200px;" src="Screenshot_2026-07-18_220821-removebg-preview.png" alt="logo"></div>
+    </header>
+
+    <h1>Appliance Control</h1>
+    <!-- Appliance Toggle Button -->
+    <button id="applianceBtn" onclick="toggleAppliance()">Loading...</button>
+    <br>
+    <!-- Theme Toggle Button -->
+    
+    <br>
+    <script>
+        // --- MQTT LOGIC ---
+        const broker = "YOUR_BROKER_IP";
+        const port = 8083;
+        const pubTopic = "home/light/set";
+        const subTopic = "home/light/state";
+
+        let isOn = false;
+        const btn = document.getElementById("applianceBtn");
+
+        client = new Paho.MQTT.Client(broker, Number(port), "web_client_" + parseInt(Math.random() * 100));
+        client.onMessageArrived = onMessageArrived;
+        client.connect({onSuccess: onConnect});
+
+        function onConnect() {
+            client.subscribe(subTopic);
+            btn.innerText = "OFF";
+            btn.className = "off";
+        }
+
+        function toggleAppliance() {
+            let newState = isOn ? "0" : "1";
+            message = new Paho.MQTT.Message(newState);
+            message.destinationName = pubTopic;
+            client.send(message);
+        }
+
+        function onMessageArrived(message) {
+            isOn = (message.payloadString === "1");
+            btn.innerText = isOn ? "ON" : "OFF";
+            btn.className = isOn ? "on" : "off";
+        }
+    </script>
+</body>
+</html>
