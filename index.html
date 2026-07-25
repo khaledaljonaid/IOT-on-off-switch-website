@@ -16,18 +16,20 @@
     <button id="applianceBtn" onclick="toggleAppliance()">Connecting...</button>
 
     <script>
-        // --- PUBLIC MQTT CONFIGURATION ---
+        // --- PUBLIC MQTT CONFIGURATION FOR VERCEL ---
         const broker = "broker.hivemq.com";
-        const port = 8884; 
+        const port = 8884; // Port 8884 is required for Secure WebSockets (wss://)
         const pubTopic = "my_secret_esp32_project_12345/set";
         const subTopic = "my_secret_esp32_project_12345/state";
 
         let isOn = false;
         const btn = document.getElementById("applianceBtn");
 
+        // Note the path parameter "/mqtt" added as the 3rd argument
         client = new Paho.MQTT.Client(broker, Number(port), "/mqtt", "web_client_" + parseInt(Math.random() * 100));
         client.onMessageArrived = onMessageArrived;
-        
+
+        // Explicitly pass useSSL: true
         client.connect({
             useSSL: true,
             onSuccess: onConnect,
@@ -42,28 +44,6 @@
             client.subscribe(subTopic);
             btn.innerText = "OFF";
             btn.className = "off";
-        }
-
-        function toggleAppliance() {
-            // 1. Determine what the next state should be
-            let nextState = isOn ? "0" : "1";
-            
-            // 2. Send command to broker
-            message = new Paho.MQTT.Message(nextState);
-            message.destinationName = pubTopic;
-            client.send(message);
-
-            // 3. OPTIMISTIC UPDATE: Change button immediately so it never feels stuck
-            isOn = (nextState === "1");
-            btn.innerText = isOn ? "OFF" : "ON";
-            btn.className = isOn ? "off" : "on";
-        }
-
-        // This keeps it synced if the physical button is pressed
-        function onMessageArrived(message) {
-            isOn = (message.payloadString === "1");
-            btn.innerText = isOn ? "OFF" : "ON";
-            btn.className = isOn ? "off" : "on";
         }
     </script>
 </body>
