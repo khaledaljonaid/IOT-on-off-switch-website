@@ -2,13 +2,16 @@
 <html>
 <head>
     <title>ESP32 Control</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.js"></script>
+    <!-- Working MQTT CDN (Replaced broken Cloudflare link) -->
+    <script src="https://cdn.jsdelivr.net/npm/paho-mqtt@1.1.0/paho-mqtt.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <header>
-        <div class="logo"><img style="width: 200px;" src="Screenshot_2026-07-18_220821-removebg-preview.png" alt="logo"></div>
+        <div class="logo">
+            <img style="width: 200px;" src="Screenshot_2026-07-18_220821-removebg-preview.png" alt="logo">
+        </div>
     </header>
 
     <h1>Appliance Control</h1>
@@ -73,6 +76,6 @@
         btn.innerText = isOn ? "ON" : "OFF";
         btn.className = isOn ? "on" : "off";
     }
-</script>
+    </script>
 </body>
 </html>
