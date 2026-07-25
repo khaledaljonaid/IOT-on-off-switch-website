@@ -16,35 +16,63 @@
     <button id="applianceBtn" onclick="toggleAppliance()">Connecting...</button>
 
     <script>
-        // --- PUBLIC MQTT CONFIGURATION FOR VERCEL ---
-        const broker = "broker.hivemq.com";
-        const port = 8884; // Port 8884 is required for Secure WebSockets (wss://)
-        const pubTopic = "my_secret_esp32_project_12345/set";
-        const subTopic = "my_secret_esp32_project_12345/state";
+    // --- MQTT CONFIGURATION ---
+    const broker = "broker.hivemq.com";
+    const port = 8884; 
+    const pubTopic = "my_secret_esp32_project_12345/set";
+    const subTopic = "my_secret_esp32_project_12345/state";
 
-        let isOn = false;
-        const btn = document.getElementById("applianceBtn");
+    let isOn = false;
+    const btn = document.getElementById("applianceBtn");
 
-        // Note the path parameter "/mqtt" added as the 3rd argument
-        client = new Paho.MQTT.Client(broker, Number(port), "/mqtt", "web_client_" + parseInt(Math.random() * 100));
-        client.onMessageArrived = onMessageArrived;
+    // Generate a unique Client ID to avoid disconnect loops
+    const uniqueClientId = "web_client_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
 
-        // Explicitly pass useSSL: true
-        client.connect({
-            useSSL: true,
-            onSuccess: onConnect,
-            onFailure: (err) => {
-                console.log("Connection failed: " + err.errorMessage);
-                btn.innerText = "Connection Failed";
-            }
-        });
+    // Create Paho MQTT client
+    client = new Paho.MQTT.Client(broker, Number(port), "/mqtt", uniqueClientId);
+    
+    client.onMessageArrived = onMessageArrived;
+    client.onConnectionLost = (responseObject) => {
+        console.log("Connection Lost: " + responseObject.errorMessage);
+        btn.innerText = "Reconnecting...";
+    };
 
-        function onConnect() {
-            console.log("Connected to Public Broker");
-            client.subscribe(subTopic);
-            btn.innerText = "OFF";
-            btn.className = "off";
+    // Connect with SSL enabled for Vercel
+    client.connect({
+        useSSL: true,
+        cleanSession: true,
+        timeout: 10,
+        onSuccess: onConnect,
+        onFailure: (err) => {
+            console.error("Connection Failed:", err);
+            btn.innerText = "Connection Failed";
         }
-    </script>
+    });
+
+    function onConnect() {
+        console.log("Connected successfully to broker as:", uniqueClientId);
+        client.subscribe(subTopic);
+        btn.innerText = "OFF";
+        btn.className = "off";
+    }
+
+    function toggleAppliance() {
+        let nextState = isOn ? "0" : "1";
+        
+        message = new Paho.MQTT.Message(nextState);
+        message.destinationName = pubTopic;
+        client.send(message);
+
+        isOn = (nextState === "1");
+        btn.innerText = isOn ? "ON" : "OFF";
+        btn.className = isOn ? "on" : "off";
+    }
+
+    function onMessageArrived(message) {
+        isOn = (message.payloadString === "1");
+        btn.innerText = isOn ? "ON" : "OFF";
+        btn.className = isOn ? "on" : "off";
+    }
+</script>
 </body>
 </html>
