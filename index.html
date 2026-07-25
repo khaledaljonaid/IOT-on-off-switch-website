@@ -2,7 +2,7 @@
 <html>
 <head>
     <title>ESP32 Control</title>
-    <!-- Working MQTT CDN (Replaced broken Cloudflare link) -->
+    <!-- Working MQTT CDN -->
     <script src="https://cdn.jsdelivr.net/npm/paho-mqtt@1.1.0/paho-mqtt.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -19,63 +19,63 @@
     <button id="applianceBtn" onclick="toggleAppliance()">Connecting...</button>
 
     <script>
-    // --- MQTT CONFIGURATION ---
-    const broker = "broker.hivemq.com";
-    const port = 8884; 
-    const pubTopic = "my_secret_esp32_project_12345/set";
-    const subTopic = "my_secret_esp32_project_12345/state";
+        // --- MQTT CONFIGURATION ---
+        const broker = "broker.hivemq.com";
+        const port = 8884; 
+        const pubTopic = "my_secret_esp32_project_12345/set";
+        const subTopic = "my_secret_esp32_project_12345/state";
 
-    let isOn = false;
-    const btn = document.getElementById("applianceBtn");
+        let isOn = false;
+        const btn = document.getElementById("applianceBtn");
 
-    // Generate a unique Client ID to avoid disconnect loops
-    const uniqueClientId = "web_client_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
+        // Generate a unique Client ID to avoid disconnect loops
+        const uniqueClientId = "web_client_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
 
-    // Create Paho MQTT client
-    client = new Paho.MQTT.Client(broker, Number(port), "/mqtt", uniqueClientId);
-    
-    client.onMessageArrived = onMessageArrived;
-    client.onConnectionLost = (responseObject) => {
-        console.log("Connection Lost: " + responseObject.errorMessage);
-        btn.innerText = "Reconnecting...";
-    };
-
-    // Connect with SSL enabled for Vercel
-    client.connect({
-        useSSL: true,
-        cleanSession: true,
-        timeout: 10,
-        onSuccess: onConnect,
-        onFailure: (err) => {
-            console.error("Connection Failed:", err);
-            btn.innerText = "Connection Failed";
-        }
-    });
-
-    function onConnect() {
-        console.log("Connected successfully to broker as:", uniqueClientId);
-        client.subscribe(subTopic);
-        btn.innerText = "OFF";
-        btn.className = "off";
-    }
-
-    function toggleAppliance() {
-        let nextState = isOn ? "0" : "1";
+        // Create Paho MQTT client (Paho.Client for v1.1.0)
+        client = new Paho.Client(broker, Number(port), "/mqtt", uniqueClientId);
         
-        message = new Paho.MQTT.Message(nextState);
-        message.destinationName = pubTopic;
-        client.send(message);
+        client.onMessageArrived = onMessageArrived;
+        client.onConnectionLost = (responseObject) => {
+            console.log("Connection Lost: " + responseObject.errorMessage);
+            btn.innerText = "Reconnecting...";
+        };
 
-        isOn = (nextState === "1");
-        btn.innerText = isOn ? "ON" : "OFF";
-        btn.className = isOn ? "on" : "off";
-    }
+        // Connect with SSL enabled for Vercel
+        client.connect({
+            useSSL: true,
+            cleanSession: true,
+            timeout: 10,
+            onSuccess: onConnect,
+            onFailure: (err) => {
+                console.error("Connection Failed:", err);
+                btn.innerText = "Connection Failed";
+            }
+        });
 
-    function onMessageArrived(message) {
-        isOn = (message.payloadString === "1");
-        btn.innerText = isOn ? "ON" : "OFF";
-        btn.className = isOn ? "on" : "off";
-    }
+        function onConnect() {
+            console.log("Connected successfully to broker as:", uniqueClientId);
+            client.subscribe(subTopic);
+            btn.innerText = "OFF";
+            btn.className = "off";
+        }
+
+        function toggleAppliance() {
+            let nextState = isOn ? "0" : "1";
+            
+            message = new Paho.Message(nextState);
+            message.destinationName = pubTopic;
+            client.send(message);
+
+            isOn = (nextState === "1");
+            btn.innerText = isOn ? "ON" : "OFF";
+            btn.className = isOn ? "on" : "off";
+        }
+
+        function onMessageArrived(message) {
+            isOn = (message.payloadString === "1");
+            btn.innerText = isOn ? "ON" : "OFF";
+            btn.className = isOn ? "on" : "off";
+        }
     </script>
 </body>
 </html>
