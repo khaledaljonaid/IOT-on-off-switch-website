@@ -5,14 +5,106 @@ body {
     font-family: sans-serif; 
     text-align: center; 
 }
-header {
-    text-align: left;
 
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
 }
+
 #applianceBtn {
     width: 100px;
     height: 30px;
     background-color: rgb(0, 162, 255);
-    border-color: rgb(0, 162, 255);
+    border: 1px solid rgb(0, 162, 255);
+    color: white;
+    font-weight: bold;
     border-radius: 5px;
+    cursor: pointer;
+    margin-top: 20px;
+}
+/* Authentication Inputs */
+#loginSection input, #ownerSection input {
+    width: 250px;
+    padding: 10px;
+    margin: 8px 0;
+    border-radius: 5px;
+    border: 1px solid #333;
+    background-color: #111;
+    color: white;
+    outline: none;
+}
+
+.authBtn, #logoutBtn {
+    width: 150px;
+    padding: 10px;
+    margin-top: 10px;
+    background-color: #333;
+    color: white;
+    border: 1px solid #555;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.authBtn:hover, #logoutBtn:hover {
+    background-color: #444;
+}
+
+.error-text {
+    color: #ef4444;
+    font-size: 0.9rem;
+    margin-top: 10px;
+}
+
+.success-text {
+    color: #22c55e;
+    font-size: 0.9rem;
+    margin-top: 10px;
+}
+
+.toggle-text {
+    margin-top: 20px;
+    font-size: 0.85rem;
+    color: #888;
+}
+
+.toggle-text span {
+    color: rgb(0, 162, 255);
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+/* Admin Table Styling */
+.admin-table {
+    margin: 20px auto;
+    border-collapse: collapse;
+    width: 90%;
+    max-width: 600px;
+    background-color: #111;
+}
+
+.admin-table th, .admin-table td {
+    border: 1px solid #333;
+    padding: 10px;
+    font-size: 0.85rem;
+}
+
+.admin-table th {
+    background-color: #222;
+    color: rgb(0, 162, 255);
+}
+
+.deleteBtn {
+    background-color: #ef4444;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.deleteBtn:hover {
+    background-color: #dc2626;
 }
