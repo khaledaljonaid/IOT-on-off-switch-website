@@ -12,69 +12,283 @@
         <div class="logo">
             <img style="width: 200px;" src="Screenshot_2026-07-18_220821-removebg-preview.png" alt="logo">
         </div>
+        <button id="logoutBtn" onclick="logout()" style="display: none;">Sign Out</button>
     </header>
 
-    <h1>Appliance Control</h1>
-    
-    <button id="applianceBtn" onclick="toggleAppliance()">Connecting...</button>
+    <!-- 1. CLIENT SIGN-IN SECTION -->
+    <div id="loginSection">
+        <h1>Sign In</h1>
+        <form id="loginForm">
+            <input type="email" id="loginEmail" placeholder="Email" required><br>
+            <input type="password" id="loginPassword" placeholder="Password" required><br>
+            <button type="submit" class="authBtn">Login</button>
+        </form>
+        <p id="loginErrorMsg" class="error-text" style="display: none;">Invalid credentials!</p>
+        <p class="toggle-text"><span onclick="showOwnerPanel()">Owner Portal</span></p>
+    </div>
+
+    <!-- 2. OWNER / ADMIN PANEL (Hidden from clients) -->
+    <div id="ownerSection" style="display: none;">
+        <h1>Owner Dashboard</h1>
+        
+        <!-- Admin Key Input -->
+        <div id="adminAuthBox">
+            <input type="password" id="adminKeyInput" placeholder="Enter Owner Secret Key"><br>
+            <button class="authBtn" onclick="verifyAdminKey()">Access Admin Panel</button>
+            <p id="adminAuthError" class="error-text" style="display: none;"></p>
+        </div>
+
+        <!-- Management Area (shown after entering valid Admin Key) -->
+        <div id="adminControls" style="display: none;">
+            <h2>Add New Client Account</h2>
+            <form id="adminAddForm">
+                <input type="email" id="newEmail" placeholder="Client Email" required><br>
+                <input type="password" id="newPassword" placeholder="Client Password" required><br>
+                <input type="text" id="newTitle" placeholder="Device Name (e.g. Living Room ESP)" required><br>
+                <input type="text" id="newPubTopic" placeholder="Publish Topic (e.g. esp1/set)" required><br>
+                <input type="text" id="newSubTopic" placeholder="Subscribe Topic (e.g. esp1/state)" required><br>
+                <button type="submit" class="authBtn">Add Client</button>
+            </form>
+            <p id="adminAddMsg" class="success-text" style="display: none;"></p>
+
+            <h2 style="margin-top: 30px;">Existing Clients</h2>
+            <div id="userListContainer"></div>
+        </div>
+
+        <p class="toggle-text"><span onclick="showLoginSection()">← Back to Sign In</span></p>
+    </div>
+
+    <!-- 3. CLIENT CONTROL SECTION -->
+    <div id="controlSection" style="display: none;">
+        <h1 id="deviceHeader">Appliance Control</h1>
+        <button id="applianceBtn" onclick="toggleAppliance()">Connecting...</button>
+    </div>
 
     <script>
-        // --- MQTT CONFIGURATION ---
         const broker = "broker.hivemq.com";
-        const port = 8884; 
-        const pubTopic = "my_secret_esp32_project_12345/set";
-        const subTopic = "my_secret_esp32_project_12345/state";
+        const port = 8884;
+        const API_URL = "http://localhost:3000/api";
 
+        let client = null;
+        let activeAccount = null;
         let isOn = false;
+        let currentAdminKey = "";
+
+        const loginSection = document.getElementById("loginSection");
+        const ownerSection = document.getElementById("ownerSection");
+        const controlSection = document.getElementById("controlSection");
+        const logoutBtn = document.getElementById("logoutBtn");
         const btn = document.getElementById("applianceBtn");
 
-        // Generate a unique Client ID to avoid disconnect loops
-        const uniqueClientId = "web_client_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
-
-        // Create Paho MQTT client (Paho.Client for v1.1.0)
-        client = new Paho.Client(broker, Number(port), "/mqtt", uniqueClientId);
-        
-        client.onMessageArrived = onMessageArrived;
-        client.onConnectionLost = (responseObject) => {
-            console.log("Connection Lost: " + responseObject.errorMessage);
-            btn.innerText = "Reconnecting...";
-        };
-
-        // Connect with SSL enabled for Vercel
-        client.connect({
-            useSSL: true,
-            cleanSession: true,
-            timeout: 10,
-            onSuccess: onConnect,
-            onFailure: (err) => {
-                console.error("Connection Failed:", err);
-                btn.innerText = "Connection Failed";
+        // CHECK SAVED CLIENT SESSION ON LOAD
+        window.addEventListener("DOMContentLoaded", () => {
+            const savedUserData = localStorage.getItem("activeEspUser");
+            if (savedUserData) {
+                activeAccount = JSON.parse(savedUserData);
+                openDashboard();
             }
         });
 
-        function onConnect() {
-            console.log("Connected successfully to broker as:", uniqueClientId);
-            client.subscribe(subTopic);
-            btn.innerText = "OFF";
-            btn.className = "off";
+        // VIEW TOGGLES
+        function showOwnerPanel() {
+            loginSection.style.display = "none";
+            ownerSection.style.display = "block";
+        }
+
+        function showLoginSection() {
+            ownerSection.style.display = "none";
+            loginSection.style.display = "block";
+        }
+
+        // CLIENT LOGIN
+        document.getElementById("loginForm").addEventListener("submit", async function(e) {
+            e.preventDefault();
+            const email = document.getElementById("loginEmail").value.trim().toLowerCase();
+            const password = document.getElementById("loginPassword").value;
+            const errorMsg = document.getElementById("loginErrorMsg");
+
+            try {
+                const res = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    activeAccount = data.user;
+                    localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
+                    errorMsg.style.display = "none";
+                    openDashboard();
+                } else {
+                    errorMsg.innerText = data.message;
+                    errorMsg.style.display = "block";
+                }
+            } catch (err) {
+                errorMsg.innerText = "Cannot connect to server!";
+                errorMsg.style.display = "block";
+            }
+        });
+
+        // ADMIN: VERIFY KEY & LOAD USERS
+        async function verifyAdminKey() {
+            const keyInput = document.getElementById("adminKeyInput").value;
+            const authError = document.getElementById("adminAuthError");
+
+            try {
+                const res = await fetch(`${API_URL}/admin/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminKey: keyInput })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    currentAdminKey = keyInput;
+                    authError.style.display = "none";
+                    document.getElementById("adminAuthBox").style.display = "none";
+                    document.getElementById("adminControls").style.display = "block";
+                    renderUserList(data.users);
+                } else {
+                    authError.innerText = data.message;
+                    authError.style.display = "block";
+                }
+            } catch (err) {
+                authError.innerText = "Cannot connect to backend server!";
+                authError.style.display = "block";
+            }
+        }
+
+        // ADMIN: RENDER USER LIST TABLE
+        function renderUserList(users) {
+            const container = document.getElementById("userListContainer");
+            if (users.length === 0) {
+                container.innerHTML = "<p style='color: #888;'>No clients added yet.</p>";
+                return;
+            }
+
+            let html = "<table class='admin-table'><tr><th>Email</th><th>Device Name</th><th>Action</th></tr>";
+            users.forEach(u => {
+                html += `<tr>
+                    <td>${u.email}</td>
+                    <td>${u.title}</td>
+                    <td><button class='deleteBtn' onclick="deleteUser('${u.email}')">Delete</button></td>
+                </tr>`;
+            });
+            html += "</table>";
+            container.innerHTML = html;
+        }
+
+        // ADMIN: ADD USER
+        document.getElementById("adminAddForm").addEventListener("submit", async function(e) {
+            e.preventDefault();
+            const email = document.getElementById("newEmail").value.trim().toLowerCase();
+            const password = document.getElementById("newPassword").value;
+            const title = document.getElementById("newTitle").value.trim();
+            const pubTopic = document.getElementById("newPubTopic").value.trim();
+            const subTopic = document.getElementById("newSubTopic").value.trim();
+            const msgBox = document.getElementById("adminAddMsg");
+
+            try {
+                const res = await fetch(`${API_URL}/admin/add-user`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminKey: currentAdminKey, email, password, title, pubTopic, subTopic })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    msgBox.innerText = data.message;
+                    msgBox.style.display = "block";
+                    document.getElementById("adminAddForm").reset();
+                    verifyAdminKey(); // Refresh user list
+                } else {
+                    alert(data.message);
+                }
+            } catch (err) {
+                alert("Server error!");
+            }
+        });
+
+        // ADMIN: DELETE USER
+        async function deleteUser(email) {
+            if (!confirm(`Are you sure you want to delete client: ${email}?`)) return;
+
+            try {
+                const res = await fetch(`${API_URL}/admin/delete-user`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminKey: currentAdminKey, email })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    verifyAdminKey(); // Refresh list after deletion
+                } else {
+                    alert(data.message);
+                }
+            } catch (err) {
+                alert("Server error!");
+            }
+        }
+
+        // CLIENT DASHBOARD
+        function openDashboard() {
+            loginSection.style.display = "none";
+            ownerSection.style.display = "none";
+            controlSection.style.display = "block";
+            logoutBtn.style.display = "block";
+            document.getElementById("deviceHeader").innerText = activeAccount.title;
+
+            initMqttConnection();
+        }
+
+        function initMqttConnection() {
+            const uniqueClientId = "web_client_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
+            client = new Paho.Client(broker, Number(port), "/mqtt", uniqueClientId);
+            
+            client.onMessageArrived = (msg) => {
+                isOn = (msg.payloadString === "1");
+                btn.innerText = isOn ? "ON" : "OFF";
+                btn.className = isOn ? "on" : "off";
+            };
+
+            client.onConnectionLost = () => { btn.innerText = "Reconnecting..."; };
+
+            client.connect({
+                useSSL: true,
+                cleanSession: true,
+                timeout: 10,
+                onSuccess: () => {
+                    client.subscribe(activeAccount.subTopic);
+                    btn.innerText = "OFF";
+                    btn.className = "off";
+                },
+                onFailure: () => { btn.innerText = "Connection Failed"; }
+            });
         }
 
         function toggleAppliance() {
+            if (!client || !client.isConnected()) return;
             let nextState = isOn ? "0" : "1";
-            
-            message = new Paho.Message(nextState);
-            message.destinationName = pubTopic;
+            let message = new Paho.Message(nextState);
+            message.destinationName = activeAccount.pubTopic;
             client.send(message);
 
             isOn = (nextState === "1");
-            btn.innerText = isOn ? "OFF" : "ON";
+            btn.innerText = isOn ? "ON" : "OFF";
             btn.className = isOn ? "on" : "off";
         }
 
-        function onMessageArrived(message) {
-            isOn = (message.payloadString === "1");
-            btn.innerText = isOn ? "OFF" : "ON";
-            btn.className = isOn ? "on" : "off";
+        function logout() {
+            localStorage.removeItem("activeEspUser");
+            if (client && client.isConnected()) client.disconnect();
+            activeAccount = null;
+            
+            controlSection.style.display = "none";
+            logoutBtn.style.display = "none";
+            loginSection.style.display = "block";
+            document.getElementById("loginForm").reset();
         }
     </script>
 </body>
