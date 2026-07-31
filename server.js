@@ -14,7 +14,7 @@ app.use(express.static(__dirname));
 
 const DB_FILE = 'users.json';
 // Secret key to access Owner Portal (Change this to your preferred password)
-const ADMIN_SECRET = process.env.ADMIN_SECRET || 'khaled';
+const ADMIN_SECRET = process.env.ADMIN_SECRET || 'my_super_secret_owner_key_123';
 
 // Helper: Read users from JSON file
 function getUsers() {
@@ -101,13 +101,8 @@ app.post('/api/admin/delete-user', (req, res) => {
     res.json({ success: true, message: 'Client account deleted successfully!' });
 });
 
-// FIX 3: Serve index.html on root '/' and catch-all routes
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Catch-all route for web pages
-app.get('*', (req, res) => {
+// FIX: Compatible with Express v5 wildcard path matching ('/*')
+app.get('/*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
