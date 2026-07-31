@@ -1,15 +1,20 @@
+//node server.js
 // server.js
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
+const path = require('path'); // Added for path resolution
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
+// Serve static web files (HTML, CSS, JS) from the current directory
+app.use(express.static(__dirname));
+
 const DB_FILE = 'users.json';
 // Secret key to access Owner Portal (Change this to your preferred password)
-const ADMIN_SECRET = process.env.ADMIN_SECRET || 'my_super_secret_owner_key_123';
+const ADMIN_SECRET = process.env.ADMIN_SECRET || 'khaled';
 
 // Helper: Read users from JSON file
 function getUsers() {
@@ -94,6 +99,16 @@ app.post('/api/admin/delete-user', (req, res) => {
     saveUsers(users);
 
     res.json({ success: true, message: 'Client account deleted successfully!' });
+});
+
+// FIX 3: Serve index.html on root '/' and catch-all routes
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Catch-all route for web pages
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Start Server (Uses Render's PORT variable when deployed, or 3000 locally)
