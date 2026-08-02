@@ -24,6 +24,7 @@ header {
     cursor: pointer;
     margin-top: 20px;
 }
+
 /* Authentication Inputs */
 #loginSection input, #ownerSection input {
     width: 250px;
@@ -107,4 +108,34 @@ header {
 
 .deleteBtn:hover {
     background-color: #dc2626;
+}
+
+/* Flex container for side-by-side admin forms */
+.forms-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 40px;
+    flex-wrap: wrap; /* Automatically stacks on smaller/mobile screens */
+    margin: 20px auto;
+    max-width: 900px;
+}
+
+.form-card {
+    flex: 1;
+    min-width: 280px; /* Force wrap if screen width drops below this */
+    max-width: 400px;
+}
+
+/* Ensure the dropdown matches input field styling */
+#targetClientSelect {
+    width: 270px;
+    padding: 10px;
+    margin: 8px 0;
+    border-radius: 5px;
+    border: 1px solid #333;
+    background-color: #111;
+    color: white;
+    outline: none;
+    box-sizing: border-box;
 }
