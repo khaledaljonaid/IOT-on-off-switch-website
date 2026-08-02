@@ -14,7 +14,7 @@ app.use(express.static(__dirname));
 
 const DB_FILE = 'users.json';
 // Secret key to access Owner Portal
-const ADMIN_SECRET = process.env.ADMIN_SECRET || 'my_super_secret_owner_key_123';
+const ADMIN_SECRET = process.env.ADMIN_SECRET || 'khaled123_123';
 
 // Helper: Read users from JSON file
 function getUsers() {
