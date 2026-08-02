@@ -1,56 +1,81 @@
+* {
+    box-sizing: border-box;
+}
+
 body { 
-    margin: 0px;    
+    margin: 0;    
     background-color: black;
     color: white;
     font-family: sans-serif; 
-    text-align: center; 
+    text-align: center;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
 header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 20px;
+    padding: 15px 20px;
+    width: 100%;
 }
 
-#applianceBtn {
-    width: 100px;
-    height: 30px;
-    background-color: rgb(0, 162, 255);
-    border: 1px solid rgb(0, 162, 255);
-    color: white;
-    font-weight: bold;
-    border-radius: 5px;
-    cursor: pointer;
-    margin-top: 20px;
+.logo img {
+    width: 140px; /* Reduced fixed height for mobile header */
+    height: auto;
+}
+
+/* Section Containers - Centered Vertically */
+#loginSection, #ownerSection, #controlSection {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    width: 100%;
+}
+
+h1 {
+    font-size: 1.8rem;
+    margin-bottom: 20px;
+}
+
+h2 {
+    font-size: 1.3rem;
 }
 
 /* Authentication Inputs */
 #loginSection input, #ownerSection input {
-    width: 250px;
-    padding: 10px;
+    width: 100%;
+    max-width: 300px;
+    padding: 12px;
     margin: 8px 0;
-    border-radius: 5px;
+    border-radius: 6px;
     border: 1px solid #333;
     background-color: #111;
     color: white;
     outline: none;
+    font-size: 1rem;
 }
 
 .authBtn, #logoutBtn {
-    width: 150px;
-    padding: 10px;
+    width: 100%;
+    max-width: 300px;
+    padding: 12px;
     margin-top: 10px;
-    background-color: #333;
+    background-color: #007bc7;
     color: white;
-    border: 1px solid #555;
-    border-radius: 5px;
+    border: none;
+    border-radius: 6px;
     cursor: pointer;
     font-weight: bold;
+    font-size: 1rem;
 }
 
 .authBtn:hover, #logoutBtn:hover {
-    background-color: #444;
+    background-color: #0091eb;
 }
 
 .error-text {
@@ -66,8 +91,8 @@ header {
 }
 
 .toggle-text {
-    margin-top: 20px;
-    font-size: 0.85rem;
+    margin-top: 25px;
+    font-size: 0.9rem;
     color: #888;
 }
 
@@ -77,11 +102,43 @@ header {
     text-decoration: underline;
 }
 
+/* Flex container for side-by-side admin forms */
+.forms-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 30px;
+    flex-wrap: wrap;
+    margin: 20px auto;
+    width: 100%;
+    max-width: 800px;
+}
+
+.form-card {
+    flex: 1;
+    min-width: 280px;
+    max-width: 380px;
+    width: 100%;
+}
+
+#targetClientSelect {
+    width: 100%;
+    max-width: 300px;
+    padding: 12px;
+    margin: 8px 0;
+    border-radius: 6px;
+    border: 1px solid #333;
+    background-color: #111;
+    color: white;
+    outline: none;
+    font-size: 1rem;
+}
+
 /* Admin Table Styling */
 .admin-table {
     margin: 20px auto;
     border-collapse: collapse;
-    width: 90%;
+    width: 100%;
     max-width: 600px;
     background-color: #111;
 }
@@ -101,41 +158,11 @@ header {
     background-color: #ef4444;
     color: white;
     border: none;
-    padding: 5px 10px;
-    border-radius: 3px;
+    padding: 6px 12px;
+    border-radius: 4px;
     cursor: pointer;
 }
 
 .deleteBtn:hover {
     background-color: #dc2626;
-}
-
-/* Flex container for side-by-side admin forms */
-.forms-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    gap: 40px;
-    flex-wrap: wrap; /* Automatically stacks on smaller/mobile screens */
-    margin: 20px auto;
-    max-width: 900px;
-}
-
-.form-card {
-    flex: 1;
-    min-width: 280px; /* Force wrap if screen width drops below this */
-    max-width: 400px;
-}
-
-/* Ensure the dropdown matches input field styling */
-#targetClientSelect {
-    width: 270px;
-    padding: 10px;
-    margin: 8px 0;
-    border-radius: 5px;
-    border: 1px solid #333;
-    background-color: #111;
-    color: white;
-    outline: none;
-    box-sizing: border-box;
 }
