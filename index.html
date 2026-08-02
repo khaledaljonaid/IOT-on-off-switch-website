@@ -40,18 +40,37 @@
 
         <!-- Management Area (shown after entering valid Admin Key) -->
         <div id="adminControls" style="display: none;">
-            <h2>Add New Client Account</h2>
-            <form id="adminAddForm">
-                <input type="email" id="newEmail" placeholder="Client Email" required><br>
-                <input type="password" id="newPassword" placeholder="Client Password" required><br>
-                <input type="text" id="newTitle" placeholder="Device Name (e.g. Living Room ESP)" required><br>
-                <input type="text" id="newPubTopic" placeholder="Publish Topic (e.g. esp1/set)" required><br>
-                <input type="text" id="newSubTopic" placeholder="Subscribe Topic (e.g. esp1/state)" required><br>
-                <button type="submit" class="authBtn">Add Client</button>
-            </form>
-            <p id="adminAddMsg" class="success-text" style="display: none;"></p>
+            
+            <div class="forms-wrapper">
+                
+                <div class="form-card">
+                    <h2>Add New Client Account</h2>
+                    <form id="adminAddForm">
+                        <input type="email" id="newEmail" placeholder="Client Email" required><br>
+                        <input type="password" id="newPassword" placeholder="Client Password" required><br>
+                        <input type="text" id="newTitle" placeholder="Device Name (e.g. Living Room ESP)" required><br>
+                        <button type="submit" class="authBtn">Add Client</button>
+                    </form>
+                    <p id="adminAddMsg" class="success-text" style="display: none;"></p>
+                </div>
 
-            <h2 style="margin-top: 30px;">Existing Clients</h2>
+                <div class="form-card">
+                    <h2>Add Button to Client</h2>
+                    <form id="adminAddBtnForm">
+                        <select id="targetClientSelect" required>
+                            <option value="" disabled selected>Select Client Email</option>
+                        </select><br>
+                        <input type="text" id="btnNameInput" placeholder="Button Name (e.g. Lamp 1)" required><br>
+                        <input type="text" id="btnPubTopic" placeholder="Publish Topic (e.g. room/lamp/set)" required><br>
+                        <input type="text" id="btnSubTopic" placeholder="Subscribe Topic (e.g. room/lamp/state)" required><br>
+                        <button type="submit" class="authBtn">Add Button</button>
+                    </form>
+                    <p id="adminAddBtnMsg" class="success-text" style="display: none;"></p>
+                </div>
+
+            </div>
+
+            <h2 style="margin-top: 40px;">Existing Clients & Buttons</h2>
             <div id="userListContainer"></div>
         </div>
 
@@ -61,24 +80,27 @@
     <!-- 3. CLIENT CONTROL SECTION -->
     <div id="controlSection" style="display: none;">
         <h1 id="deviceHeader">Appliance Control</h1>
-        <button id="applianceBtn" onclick="toggleAppliance()">Connecting...</button>
+        <div id="clientButtonsContainer"></div>
     </div>
 
     <script>
         const broker = "broker.hivemq.com";
         const port = 8884;
-        const API_URL = "http://localhost:3000/api";
+        
+        // Auto-detect backend port dynamically
+        const API_URL = window.location.port === "5500" 
+            ? "http://localhost:3000/api" 
+            : "/api";
 
         let client = null;
         let activeAccount = null;
-        let isOn = false;
+        let buttonStates = {}; // Stores ON/OFF states per button
         let currentAdminKey = "";
 
         const loginSection = document.getElementById("loginSection");
         const ownerSection = document.getElementById("ownerSection");
         const controlSection = document.getElementById("controlSection");
         const logoutBtn = document.getElementById("logoutBtn");
-        const btn = document.getElementById("applianceBtn");
 
         // CHECK SAVED CLIENT SESSION ON LOAD
         window.addEventListener("DOMContentLoaded", () => {
@@ -149,6 +171,7 @@
                     document.getElementById("adminAuthBox").style.display = "none";
                     document.getElementById("adminControls").style.display = "block";
                     renderUserList(data.users);
+                    populateClientDropdown(data.users);
                 } else {
                     authError.innerText = data.message;
                     authError.style.display = "block";
@@ -159,7 +182,16 @@
             }
         }
 
-        // ADMIN: RENDER USER LIST TABLE
+        // POPULATE CLIENT SELECT DROPDOWN FOR ADDING BUTTONS
+        function populateClientDropdown(users) {
+            const select = document.getElementById("targetClientSelect");
+            select.innerHTML = '<option value="" disabled selected>Select Client Email</option>';
+            users.forEach(u => {
+                select.innerHTML += `<option value="${u.email}">${u.email} (${u.title})</option>`;
+            });
+        }
+
+        // ADMIN: RENDER USER LIST TABLE WITH BUTTON DETAILS
         function renderUserList(users) {
             const container = document.getElementById("userListContainer");
             if (users.length === 0) {
@@ -167,12 +199,22 @@
                 return;
             }
 
-            let html = "<table class='admin-table'><tr><th>Email</th><th>Device Name</th><th>Action</th></tr>";
+            let html = "<table class='admin-table'><tr><th>Email / Device</th><th>Client Buttons</th><th>Action</th></tr>";
             users.forEach(u => {
+                let buttonsList = "<em>No buttons added</em>";
+                if (u.buttons && u.buttons.length > 0) {
+                    buttonsList = u.buttons.map(b => `
+                        <div style="margin: 4px 0; background: #222; padding: 4px 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                            <span><strong>${b.name}</strong> <small>(${b.pubTopic})</small></span>
+                            <button class='deleteBtn' style='font-size:0.75rem; padding: 2px 5px;' onclick="deleteClientButton('${u.email}', '${b.id}')">X</button>
+                        </div>
+                    `).join('');
+                }
+
                 html += `<tr>
-                    <td>${u.email}</td>
-                    <td>${u.title}</td>
-                    <td><button class='deleteBtn' onclick="deleteUser('${u.email}')">Delete</button></td>
+                    <td><strong>${u.email}</strong><br><small style="color: #aaa;">${u.title}</small></td>
+                    <td style="text-align: left;">${buttonsList}</td>
+                    <td><button class='deleteBtn' onclick="deleteUser('${u.email}')">Delete User</button></td>
                 </tr>`;
             });
             html += "</table>";
@@ -185,15 +227,13 @@
             const email = document.getElementById("newEmail").value.trim().toLowerCase();
             const password = document.getElementById("newPassword").value;
             const title = document.getElementById("newTitle").value.trim();
-            const pubTopic = document.getElementById("newPubTopic").value.trim();
-            const subTopic = document.getElementById("newSubTopic").value.trim();
             const msgBox = document.getElementById("adminAddMsg");
 
             try {
                 const res = await fetch(`${API_URL}/admin/add-user`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminKey: currentAdminKey, email, password, title, pubTopic, subTopic })
+                    body: JSON.stringify({ adminKey: currentAdminKey, email, password, title })
                 });
                 const data = await res.json();
 
@@ -209,6 +249,58 @@
                 alert("Server error!");
             }
         });
+
+        // ADMIN: ADD BUTTON TO CLIENT
+        document.getElementById("adminAddBtnForm").addEventListener("submit", async function(e) {
+            e.preventDefault();
+            const targetEmail = document.getElementById("targetClientSelect").value;
+            const buttonName = document.getElementById("btnNameInput").value.trim();
+            const pubTopic = document.getElementById("btnPubTopic").value.trim();
+            const subTopic = document.getElementById("btnSubTopic").value.trim();
+            const msgBox = document.getElementById("adminAddBtnMsg");
+
+            try {
+                const res = await fetch(`${API_URL}/admin/add-button`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminKey: currentAdminKey, targetEmail, buttonName, pubTopic, subTopic })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    msgBox.innerText = data.message;
+                    msgBox.style.display = "block";
+                    document.getElementById("adminAddBtnForm").reset();
+                    verifyAdminKey(); // Refresh list
+                } else {
+                    alert(data.message);
+                }
+            } catch (err) {
+                alert("Server error!");
+            }
+        });
+
+        // ADMIN: DELETE SPECIFIC BUTTON
+        async function deleteClientButton(targetEmail, buttonId) {
+            if (!confirm(`Are you sure you want to delete this button?`)) return;
+
+            try {
+                const res = await fetch(`${API_URL}/admin/delete-button`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminKey: currentAdminKey, targetEmail, buttonId })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    verifyAdminKey(); // Refresh list
+                } else {
+                    alert(data.message);
+                }
+            } catch (err) {
+                alert("Server error!");
+            }
+        }
 
         // ADMIN: DELETE USER
         async function deleteUser(email) {
@@ -240,7 +332,28 @@
             logoutBtn.style.display = "block";
             document.getElementById("deviceHeader").innerText = activeAccount.title;
 
+            renderClientButtons();
             initMqttConnection();
+        }
+
+        function renderClientButtons() {
+            const container = document.getElementById("clientButtonsContainer");
+            container.innerHTML = "";
+
+            if (!activeAccount.buttons || activeAccount.buttons.length === 0) {
+                container.innerHTML = "<p style='color:#888;'>No control buttons assigned to your account yet.</p>";
+                return;
+            }
+
+            activeAccount.buttons.forEach(b => {
+                buttonStates[b.id] = false;
+                container.innerHTML += `
+                    <div style="margin: 15px 0;">
+                        <h3>${b.name}</h3>
+                        <button id="btn_${b.id}" class="authBtn" onclick="toggleAppliance('${b.id}', '${b.pubTopic}')">Connecting...</button>
+                    </div>
+                `;
+            });
         }
 
         function initMqttConnection() {
@@ -248,36 +361,72 @@
             client = new Paho.Client(broker, Number(port), "/mqtt", uniqueClientId);
             
             client.onMessageArrived = (msg) => {
-                isOn = (msg.payloadString === "1");
-                btn.innerText = isOn ? "ON" : "OFF";
-                btn.className = isOn ? "on" : "off";
+                if (activeAccount.buttons) {
+                    const matchedBtn = activeAccount.buttons.find(b => b.subTopic === msg.destinationName);
+                    if (matchedBtn) {
+                        const state = (msg.payloadString === "1");
+                        buttonStates[matchedBtn.id] = state;
+                        const btnEl = document.getElementById(`btn_${matchedBtn.id}`);
+                        if (btnEl) {
+                            btnEl.innerText = state ? "ON" : "OFF";
+                            btnEl.className = state ? "authBtn on" : "authBtn off";
+                        }
+                    }
+                }
             };
 
-            client.onConnectionLost = () => { btn.innerText = "Reconnecting..."; };
+            client.onConnectionLost = () => { 
+                if (activeAccount.buttons) {
+                    activeAccount.buttons.forEach(b => {
+                        const btnEl = document.getElementById(`btn_${b.id}`);
+                        if (btnEl) btnEl.innerText = "Reconnecting...";
+                    });
+                }
+            };
 
             client.connect({
                 useSSL: true,
                 cleanSession: true,
                 timeout: 10,
                 onSuccess: () => {
-                    client.subscribe(activeAccount.subTopic);
-                    btn.innerText = "OFF";
-                    btn.className = "off";
+                    if (activeAccount.buttons) {
+                        activeAccount.buttons.forEach(b => {
+                            if (b.subTopic) client.subscribe(b.subTopic);
+                            const btnEl = document.getElementById(`btn_${b.id}`);
+                            if (btnEl) {
+                                btnEl.innerText = "OFF";
+                                btnEl.className = "authBtn off";
+                            }
+                        });
+                    }
                 },
-                onFailure: () => { btn.innerText = "Connection Failed"; }
+                onFailure: () => { 
+                    if (activeAccount.buttons) {
+                        activeAccount.buttons.forEach(b => {
+                            const btnEl = document.getElementById(`btn_${b.id}`);
+                            if (btnEl) btnEl.innerText = "Connection Failed";
+                        });
+                    }
+                }
             });
         }
 
-        function toggleAppliance() {
+        function toggleAppliance(buttonId, pubTopic) {
             if (!client || !client.isConnected()) return;
-            let nextState = isOn ? "0" : "1";
+
+            let currentState = buttonStates[buttonId] || false;
+            let nextState = currentState ? "0" : "1";
+            
             let message = new Paho.Message(nextState);
-            message.destinationName = activeAccount.pubTopic;
+            message.destinationName = pubTopic;
             client.send(message);
 
-            isOn = (nextState === "1");
-            btn.innerText = isOn ? "ON" : "OFF";
-            btn.className = isOn ? "on" : "off";
+            buttonStates[buttonId] = (nextState === "1");
+            const btnEl = document.getElementById(`btn_${buttonId}`);
+            if (btnEl) {
+                btnEl.innerText = buttonStates[buttonId] ? "ON" : "OFF";
+                btnEl.className = buttonStates[buttonId] ? "authBtn on" : "authBtn off";
+            }
         }
 
         function logout() {
