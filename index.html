@@ -2,9 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <!-- ADD THIS LINE FOR MOBILE RESPONSIVENESS -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
     <title>ESP32 Control</title>
     <!-- Working MQTT CDN -->
     <script src="https://cdn.jsdelivr.net/npm/paho-mqtt@1.1.0/paho-mqtt.min.js"></script>
@@ -14,21 +12,23 @@
 
     <header>
         <div class="logo">
-            <img style="width: 200px;" src="Screenshot_2026-07-18_220821-removebg-preview.png" alt="logo">
+            <img style="width: 140px;" src="Screenshot_2026-07-18_220821-removebg-preview.png" alt="logo">
         </div>
         <button id="logoutBtn" onclick="logout()" style="display: none;">Sign Out</button>
     </header>
 
     <!-- 1. CLIENT SIGN-IN SECTION -->
     <div id="loginSection">
-        <h1>Sign In</h1>
-        <form id="loginForm">
-            <input type="email" id="loginEmail" placeholder="Email" required><br>
-            <input type="password" id="loginPassword" placeholder="Password" required><br>
-            <button type="submit" class="authBtn">Login</button>
-        </form>
-        <p id="loginErrorMsg" class="error-text" style="display: none;">Invalid credentials!</p>
-        <p class="toggle-text"><span onclick="showOwnerPanel()">Owner Portal</span></p>
+        <div class="form-container">
+            <h1>Sign In</h1>
+            <form id="loginForm">
+                <input type="email" id="loginEmail" placeholder="Email" required><br>
+                <input type="password" id="loginPassword" placeholder="Password" required><br>
+                <button type="submit" class="authBtn">Login</button>
+            </form>
+            <p id="loginErrorMsg" class="error-text" style="display: none;">Invalid credentials!</p>
+            <p class="toggle-text"><span onclick="showOwnerPanel()">Owner Portal</span></p>
+        </div>
     </div>
 
     <!-- 2. OWNER / ADMIN PANEL (Hidden from clients) -->
@@ -91,7 +91,7 @@
         const broker = "broker.hivemq.com";
         const port = 8884;
         
-        // Auto-detect backend port dynamically
+        // Auto-detect backend URL (Port 3000 locally or relative for deployment)
         const API_URL = window.location.port === "5500" 
             ? "http://localhost:3000/api" 
             : "/api";
@@ -118,12 +118,12 @@
         // VIEW TOGGLES
         function showOwnerPanel() {
             loginSection.style.display = "none";
-            ownerSection.style.display = "block";
+            ownerSection.style.display = "flex";
         }
 
         function showLoginSection() {
             ownerSection.style.display = "none";
-            loginSection.style.display = "block";
+            loginSection.style.display = "flex";
         }
 
         // CLIENT LOGIN
@@ -245,7 +245,7 @@
                     msgBox.innerText = data.message;
                     msgBox.style.display = "block";
                     document.getElementById("adminAddForm").reset();
-                    verifyAdminKey(); // Refresh user list
+                    verifyAdminKey();
                 } else {
                     alert(data.message);
                 }
@@ -275,7 +275,7 @@
                     msgBox.innerText = data.message;
                     msgBox.style.display = "block";
                     document.getElementById("adminAddBtnForm").reset();
-                    verifyAdminKey(); // Refresh list
+                    verifyAdminKey();
                 } else {
                     alert(data.message);
                 }
@@ -297,7 +297,7 @@
                 const data = await res.json();
 
                 if (data.success) {
-                    verifyAdminKey(); // Refresh list
+                    verifyAdminKey();
                 } else {
                     alert(data.message);
                 }
@@ -319,7 +319,7 @@
                 const data = await res.json();
 
                 if (data.success) {
-                    verifyAdminKey(); // Refresh list after deletion
+                    verifyAdminKey();
                 } else {
                     alert(data.message);
                 }
@@ -332,7 +332,7 @@
         function openDashboard() {
             loginSection.style.display = "none";
             ownerSection.style.display = "none";
-            controlSection.style.display = "block";
+            controlSection.style.display = "flex";
             logoutBtn.style.display = "block";
             document.getElementById("deviceHeader").innerText = activeAccount.title;
 
@@ -440,7 +440,7 @@
             
             controlSection.style.display = "none";
             logoutBtn.style.display = "none";
-            loginSection.style.display = "block";
+            loginSection.style.display = "flex";
             document.getElementById("loginForm").reset();
         }
     </script>
