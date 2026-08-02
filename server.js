@@ -3,17 +3,17 @@
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
-const path = require('path'); // Added for path resolution
+const path = require('path');
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// Serve static web files (HTML, CSS, JS) from the current directory
+// Serve static web files (index.html, css, js) from current directory
 app.use(express.static(__dirname));
 
 const DB_FILE = 'users.json';
-// Secret key to access Owner Portal (Change this to your preferred password)
+// Secret key to access Owner Portal
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'my_super_secret_owner_key_123';
 
 // Helper: Read users from JSON file
@@ -101,12 +101,12 @@ app.post('/api/admin/delete-user', (req, res) => {
     res.json({ success: true, message: 'Client account deleted successfully!' });
 });
 
-// FIX: Compatible with Express v5 wildcard path matching ('/*')
-app.get('/*', (req, res) => {
+// Root Route - Serves main page
+app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Start Server (Uses Render's PORT variable when deployed, or 3000 locally)
+// Start Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
