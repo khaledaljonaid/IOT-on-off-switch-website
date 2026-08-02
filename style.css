@@ -17,17 +17,28 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 15px 20px;
+    padding: 0px 0px;
     width: 100%;
 }
 
 .logo img {
-    width: 140px; /* Reduced fixed height for mobile header */
+    width: 140px;
     height: auto;
 }
 
-/* Section Containers - Centered Vertically */
-#loginSection, #ownerSection, #controlSection {
+/* Section Containers */
+#loginSection {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start; /* Positions form higher up */
+    align-items: center;
+    padding: 20px;
+    padding-top: 40px; /* Adjust top spacing */
+    width: 100%;
+}
+
+#ownerSection, #controlSection {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -35,6 +46,11 @@ header {
     align-items: center;
     padding: 20px;
     width: 100%;
+}
+
+.form-container {
+    width: 100%;
+    max-width: 320px;
 }
 
 h1 {
