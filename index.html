@@ -372,7 +372,7 @@
                         buttonStates[matchedBtn.id] = state;
                         const btnEl = document.getElementById(`btn_${matchedBtn.id}`);
                         if (btnEl) {
-                            btnEl.innerText = state ? "OFF" : "ON";
+                            btnEl.innerText = state ? "ON" : "OFF";
                             btnEl.className = state ? "authBtn off" : "authBtn on";
                         }
                     }
@@ -428,7 +428,7 @@
             buttonStates[buttonId] = (nextState === "1");
             const btnEl = document.getElementById(`btn_${buttonId}`);
             if (btnEl) {
-                btnEl.innerText = buttonStates[buttonId] ? "OFF" : "ON";
+                btnEl.innerText = buttonStates[buttonId] ? "ON" : "OFF";
                 btnEl.className = buttonStates[buttonId] ? "authBtn off" : "authBtn on";
             }
         }
