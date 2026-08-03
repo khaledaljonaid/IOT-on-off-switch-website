@@ -373,7 +373,7 @@
                         const btnEl = document.getElementById(`btn_${matchedBtn.id}`);
                         if (btnEl) {
                             btnEl.innerText = state ? "OFF" : "ON";
-                            btnEl.className = state ? "authBtn on" : "authBtn off";
+                            btnEl.className = state ? "authBtn off" : "authBtn on";
                         }
                     }
                 }
@@ -399,7 +399,7 @@
                             const btnEl = document.getElementById(`btn_${b.id}`);
                             if (btnEl) {
                                 btnEl.innerText = "ON";
-                                btnEl.className = "authBtn off";
+                                btnEl.className = "authBtn on";
                             }
                         });
                     }
@@ -429,7 +429,7 @@
             const btnEl = document.getElementById(`btn_${buttonId}`);
             if (btnEl) {
                 btnEl.innerText = buttonStates[buttonId] ? "OFF" : "ON";
-                btnEl.className = buttonStates[buttonId] ? "authBtn on" : "authBtn off";
+                btnEl.className = buttonStates[buttonId] ? "authBtn off" : "authBtn on";
             }
         }
 
