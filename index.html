@@ -372,7 +372,7 @@
                         buttonStates[matchedBtn.id] = state;
                         const btnEl = document.getElementById(`btn_${matchedBtn.id}`);
                         if (btnEl) {
-                            btnEl.innerText = state ? "ON" : "OFF";
+                            btnEl.innerText = state ? "OFF" : "ON";
                             btnEl.className = state ? "authBtn on" : "authBtn off";
                         }
                     }
