@@ -372,7 +372,7 @@
                         buttonStates[matchedBtn.id] = state;
                         const btnEl = document.getElementById(`btn_${matchedBtn.id}`);
                         if (btnEl) {
-                            btnEl.innerText = state ? "ON" : "OFF";
+                            btnEl.innerText = state ? "OFF" : "ON";
                             btnEl.className = state ? "authBtn on" : "authBtn off";
                         }
                     }
@@ -398,7 +398,7 @@
                             if (b.subTopic) client.subscribe(b.subTopic);
                             const btnEl = document.getElementById(`btn_${b.id}`);
                             if (btnEl) {
-                                btnEl.innerText = "OFF";
+                                btnEl.innerText = "ON";
                                 btnEl.className = "authBtn off";
                             }
                         });
@@ -428,7 +428,7 @@
             buttonStates[buttonId] = (nextState === "1");
             const btnEl = document.getElementById(`btn_${buttonId}`);
             if (btnEl) {
-                btnEl.innerText = buttonStates[buttonId] ? "ON" : "OFF";
+                btnEl.innerText = buttonStates[buttonId] ? "OFF" : "ON";
                 btnEl.className = buttonStates[buttonId] ? "authBtn on" : "authBtn off";
             }
         }
