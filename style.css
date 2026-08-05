@@ -17,7 +17,7 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0px 0px;
+    padding: 12px 18px;
     width: 100%;
 }
 
@@ -26,15 +26,15 @@ header {
     height: auto;
 }
 
-/* Section Containers */
+/* Sections */
 #loginSection {
     flex: 1;
     display: flex;
     flex-direction: column;
-    justify-content: flex-start; /* Positions form higher up */
+    justify-content: flex-start;
     align-items: center;
     padding: 20px;
-    padding-top: 40px; /* Adjust top spacing */
+    padding-top: 40px;
     width: 100%;
 }
 
@@ -46,6 +46,7 @@ header {
     align-items: center;
     padding: 20px;
     width: 100%;
+    position: relative;
 }
 
 .form-container {
@@ -62,7 +63,7 @@ h2 {
     font-size: 1.3rem;
 }
 
-/* Authentication Inputs */
+/* Form Controls */
 #loginSection input, #ownerSection input {
     width: 100%;
     max-width: 300px;
@@ -76,12 +77,13 @@ h2 {
     font-size: 1rem;
 }
 
-.authBtn, #logoutBtn {
+/* Generic Auth Button */
+.authBtn {
     width: 100%;
-    max-width: 150px;
+    max-width: 300px;
     padding: 12px;
     margin-top: 10px;
-    background-color: #007bc7;
+    background-color: rgb(0, 162, 255);
     color: white;
     border: none;
     border-radius: 6px;
@@ -90,8 +92,57 @@ h2 {
     font-size: 1rem;
 }
 
-.authBtn:hover, #logoutBtn:hover {
-    background-color: #0091eb;
+/* On/Off Appliance Buttons Always rgb(0, 162, 255) */
+.appliance-btn {
+    background-color: rgb(0, 162, 255) !important;
+}
+
+/* Smaller Sign Out Button */
+#logoutBtn {
+    width: auto;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    background-color: #222;
+    color: #ccc;
+    border: 1px solid #444;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: normal;
+}
+
+#logoutBtn:hover {
+    background-color: #333;
+    color: white;
+}
+
+/* Plus Sign Scan Button at Top Right */
+.scan-plus-btn {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    width: 42px;
+    height: 42px;
+    background-color: rgb(0, 162, 255);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    font-size: 1.8rem;
+    font-weight: bold;
+    line-height: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 0px 2px 8px rgba(0, 162, 255, 0.4);
+    transition: transform 0.1s ease;
+}
+
+.scan-plus-btn:active {
+    transform: scale(0.92);
+}
+
+.authBtn:hover {
+    opacity: 0.9;
 }
 
 .error-text {
@@ -118,7 +169,6 @@ h2 {
     text-decoration: underline;
 }
 
-/* Flex container for side-by-side admin forms */
 .forms-wrapper {
     display: flex;
     justify-content: center;
@@ -127,7 +177,7 @@ h2 {
     flex-wrap: wrap;
     margin: 20px auto;
     width: 100%;
-    max-width: 800px;
+    max-width: 400px;
 }
 
 .form-card {
@@ -137,25 +187,12 @@ h2 {
     width: 100%;
 }
 
-#targetClientSelect {
-    width: 100%;
-    max-width: 300px;
-    padding: 12px;
-    margin: 8px 0;
-    border-radius: 6px;
-    border: 1px solid #333;
-    background-color: #111;
-    color: white;
-    outline: none;
-    font-size: 1rem;
-}
-
-/* Admin Table Styling */
+/* Admin Table */
 .admin-table {
     margin: 20px auto;
     border-collapse: collapse;
     width: 100%;
-    max-width: 600px;
+    max-width: 500px;
     background-color: #111;
 }
 
