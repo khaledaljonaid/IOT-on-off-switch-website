@@ -1,159 +1,232 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 Control</title>
-    <!-- Working MQTT CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/paho-mqtt@1.1.0/paho-mqtt.min.js"></script>
-    <!-- HTML5 QR Code Reader Library -->
-    <script src="https://unpkg.com/html5-qrcode"></script>
+    <title>ESP32 Device Management Dashboard</title>
     <link rel="stylesheet" href="style.css">
-    <style>
-        /* Additional inline styles for long-press delete button */
-        .device-card {
-            margin: 15px auto;
-            max-width: 300px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .delete-device-btn {
-            background-color: #ef4444;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            font-size: 0.75rem;
-            border-radius: 4px;
-            margin-top: 8px;
-            cursor: pointer;
-            animation: fadeIn 0.2s ease-in-out;
-        }
-
-        .delete-device-btn:hover {
-            background-color: #dc2626;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-4px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>
+    <!-- Paho MQTT Library for Browser Communication -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws16.min.js" type="text/javascript"></script>
 </head>
 <body>
 
-    <header>
-        <div class="logo">
-            <img style="width: 140px;" src="Screenshot_2026-07-18_220821-removebg-preview.png" alt="logo">
+    <!-- TOP HEADER NAVBAR -->
+    <header class="header-bar">
+        <h1 class="logo-title">KAD</h1>
+        <div id="navRightControls">
+            <button id="btnOwnerPortal" onclick="showView('ownerLoginView')">Owner Panel</button>
+            <button id="btnSignOut" class="btn-secondary hidden" onclick="logout()">Sign Out</button>
         </div>
-        <button id="logoutBtn" onclick="logout()" style="display: none;">Sign Out</button>
     </header>
 
-    <!-- 1. CLIENT SIGN-IN SECTION -->
-    <div id="loginSection">
-        <div class="form-container">
-            <h1>Sign In</h1>
-            <form id="loginForm">
-                <input type="email" id="loginEmail" placeholder="Email" required><br>
-                <input type="password" id="loginPassword" placeholder="Password" required><br>
-                <button type="submit" class="authBtn">Login</button>
-            </form>
-            <p id="loginErrorMsg" class="error-text" style="display: none;">Invalid credentials!</p>
-            <p class="toggle-text"><span onclick="showOwnerPanel()">Owner Portal</span></p>
-        </div>
-    </div>
+    <!-- MAIN CONTAINER -->
+    <main class="main-container">
 
-    <!-- 2. OWNER / ADMIN PANEL -->
-    <div id="ownerSection" style="display: none;">
-        <h1>Owner Dashboard</h1>
-        
-        <div id="adminAuthBox">
-            <input type="password" id="adminKeyInput" placeholder="Enter Owner Secret Key"><br>
-            <button class="authBtn" onclick="verifyAdminKey()">Access Admin Panel</button>
-            <p id="adminAuthError" class="error-text" style="display: none;"></p>
-        </div>
-
-        <div id="adminControls" style="display: none;">
-            <div class="forms-wrapper">
-                <div class="form-card">
-                    <h2>Add New Client Account</h2>
-                    <form id="adminAddForm">
-                        <input type="email" id="newEmail" placeholder="Client Email" required><br>
-                        <input type="password" id="newPassword" placeholder="Client Password" required><br>
-                        <input type="text" id="newTitle" placeholder="Device Name (e.g. Living Room ESP)" required><br>
-                        <button type="submit" class="authBtn">Add Client</button>
-                    </form>
-                    <p id="adminAddMsg" class="success-text" style="display: none;"></p>
+        <!-- 1. CLIENT LOGIN VIEW -->
+        <section id="clientLoginView" class="card-view">
+            <h2>Client Sign In</h2>
+            <form onsubmit="handleClientLogin(event)">
+                <div class="input-group">
+                    <label for="clientEmail">Email Address</label>
+                    <input type="email" id="clientEmail" placeholder="user@example.com" required>
                 </div>
+                <div class="input-group">
+                    <label for="clientPassword">Password</label>
+                    <input type="password" id="clientPassword" placeholder="••••••••" required>
+                </div>
+                <p id="clientLoginError" class="error-msg hidden"></p>
+                <button type="submit" class="btn-primary">Sign In</button>
+            </form>
+        </section>
+
+        <!-- 2. OWNER / ADMIN LOGIN VIEW -->
+        <section id="ownerLoginView" class="card-view hidden">
+            <h2>Owner Dashboard</h2>
+            <form onsubmit="handleOwnerLogin(event)">
+                <div class="input-group">
+                    <label for="ownerSecretKey">Secret Admin Key</label>
+                    <input type="password" id="ownerSecretKey" placeholder="Enter owner key" required>
+                </div>
+                <p id="ownerLoginError" class="error-msg hidden"></p>
+                <button type="submit" class="btn-primary">Access Admin Panel</button>
+            </form>
+            <br>
+            <a href="#" onclick="showView('clientLoginView')" class="link-back">← Back to Sign In</a>
+        </section>
+
+        <!-- 3. CLIENT CONTROL DASHBOARD -->
+        <section id="clientDashboardView" class="card-view hidden">
+            <h2 id="clientTitleHeader">My Devices</h2>
+            <p id="clientEmailSub"></p>
+            <hr>
+
+            <div id="buttonsContainer" class="device-grid">
+                <!-- Dynamically Rendered Device Control Buttons -->
+            </div>
+            
+            <div id="noDevicesMsg" class="info-msg hidden">
+                <p>No paired devices found for this account.</p>
+                <p>Please contact the system administrator to add an ESP32 receiver.</p>
+            </div>
+        </section>
+
+        <!-- 4. OWNER / ADMIN CONTROL PANEL -->
+        <section id="ownerDashboardView" class="card-view hidden">
+            <h2>Admin Control Panel</h2>
+            <hr>
+
+            <!-- Section A: Register New Client Account -->
+            <div class="admin-block">
+                <h3>Create New Client Account</h3>
+                <form onsubmit="handleCreateUser(event)">
+                    <input type="email" id="newClientEmail" placeholder="Client Email" required>
+                    <input type="password" id="newClientPassword" placeholder="Account Password" required>
+                    <input type="text" id="newClientTitle" placeholder="Title/Location (e.g. Living Room)" required>
+                    <button type="submit" class="btn-secondary">+ Create Account</button>
+                </form>
             </div>
 
-            <h2 style="margin-top: 40px;">Existing Clients</h2>
-            <div id="userListContainer"></div>
-        </div>
+            <!-- Section B: Assign Device / Button to Client -->
+            <div class="admin-block">
+                <h3>Pair Device to Client Account</h3>
+                <form onsubmit="handleAddButtonToUser(event)">
+                    <select id="targetClientSelect" required>
+                        <option value="" disabled selected>Select Client Account</option>
+                    </select>
+                    <input type="text" id="newBtnName" placeholder="Device Name (e.g. Fan)" required>
+                    <input type="text" id="newPubTopic" placeholder="Publish Topic (e.g. home/fan/set)" required>
+                    <input type="text" id="newSubTopic" placeholder="Subscribe Topic (e.g. home/fan/state)" required>
+                    <input type="text" id="newMacAddr" placeholder="MAC Address (08:3A:8D:97:3D:50)" required>
+                    <button type="submit" class="btn-secondary">+ Pair Device</button>
+                </form>
+            </div>
 
-        <p class="toggle-text"><span onclick="showLoginSection()">← Back to Sign In</span></p>
-    </div>
+            <!-- Section C: Active Accounts Table -->
+            <div class="admin-block">
+                <h3>Registered Client Accounts</h3>
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Email</th>
+                            <th>Title</th>
+                            <th>Devices</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                        <!-- Dynamically filled with client accounts -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
-    <!-- 3. CLIENT CONTROL SECTION -->
-    <div id="controlSection" style="display: none;">
-        <!-- Top Right Plus Scan Button -->
-        <button class="scan-plus-btn" onclick="toggleQrScanner()" title="Pair Device">+</button>
+    </main>
 
-        <h1 id="deviceHeader">Appliance Control</h1>
-        
-        <div id="qrReader" style="width: 100%; max-width: 320px; display: none; margin: 15px auto;"></div>
-
-        <div id="clientButtonsContainer"></div>
-    </div>
-
+    <!-- APPLICATION CLIENT-SIDE LOGIC -->
     <script>
-        const broker = "broker.hivemq.com";
-        const port = 8884;
-        
-        const API_URL = window.location.port === "5500" 
-            ? "http://localhost:3000/api" 
+        // -------------------------------------------------------------
+        // DYNAMIC API HOST DETECTOR (WORKS LOCALLY AND ON RENDER)
+        // -------------------------------------------------------------
+        const API_URL = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+            ? `http://${window.location.hostname}:3000/api`
             : "/api";
 
-        let client = null;
+        const MQTT_BROKER = "broker.hivemq.com";
+        const MQTT_PORT = 8000; // WebSocket Port for Web Browsers
+
         let activeAccount = null;
-        let buttonStates = {};
-        let currentAdminKey = "";
-        let html5QrCodeScanner = null;
-        
-        // Hold Timer Variables
-        let holdTimer = null;
-        let isHoldTriggered = false;
+        let activeAdminKey = null;
+        let client = null;
 
-        const loginSection = document.getElementById("loginSection");
-        const ownerSection = document.getElementById("ownerSection");
-        const controlSection = document.getElementById("controlSection");
-        const logoutBtn = document.getElementById("logoutBtn");
-
-        window.addEventListener("DOMContentLoaded", () => {
-            const savedUserData = localStorage.getItem("activeEspUser");
-            if (savedUserData) {
-                activeAccount = JSON.parse(savedUserData);
-                openDashboard();
+        // Initialize App on DOM Content Loaded
+        document.addEventListener("DOMContentLoaded", () => {
+            initMqtt();
+            
+            // Check if saved session exists in local storage
+            const savedUser = localStorage.getItem("activeEspUser");
+            if (savedUser) {
+                activeAccount = JSON.parse(savedUser);
+                showClientDashboard();
+            } else {
+                showView('clientLoginView');
             }
         });
 
-        function showOwnerPanel() {
-            loginSection.style.display = "none";
-            ownerSection.style.display = "flex";
+        // -------------------------------------------------------------
+        // MQTT BROKER INITIALIZATION
+        // -------------------------------------------------------------
+        function initMqtt() {
+            const clientId = "WebClient_" + Math.floor(Math.random() * 10000);
+            client = new Paho.MQTT.Client(MQTT_BROKER, Number(MQTT_PORT), clientId);
+
+            client.onConnectionLost = onConnectionLost;
+            client.onMessageArrived = onMessageArrived;
+
+            client.connect({
+                onSuccess: () => console.log("Connected to HiveMQ WebSockets Broker!"),
+                onFailure: (err) => console.error("MQTT Connection Failed:", err),
+                useSSL: false
+            });
         }
 
-        function showLoginSection() {
-            ownerSection.style.display = "none";
-            loginSection.style.display = "flex";
+        function onConnectionLost(responseObject) {
+            if (responseObject.errorCode !== 0) {
+                console.warn("MQTT Connection Lost. Reconnecting...");
+                setTimeout(initMqtt, 3000);
+            }
         }
 
-        // LOGIN
-        document.getElementById("loginForm").addEventListener("submit", async function(e) {
+        function onMessageArrived(message) {
+            if (!activeAccount || !activeAccount.buttons) return;
+
+            const topic = message.destinationName;
+            const payload = message.payloadString;
+
+            activeAccount.buttons.forEach((btn, idx) => {
+                if (btn.subTopic === topic) {
+                    btn.state = (payload === "1");
+                    updateButtonUI(btn.id, btn.state);
+                }
+            });
+        }
+
+        // -------------------------------------------------------------
+        // ROUTING AND VIEW MANAGEMENT
+        // -------------------------------------------------------------
+        function showView(viewId) {
+            ['clientLoginView', 'ownerLoginView', 'clientDashboardView', 'ownerDashboardView'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(viewId).classList.remove('hidden');
+
+            const btnOwner = document.getElementById("btnOwnerPortal");
+            const btnSignOut = document.getElementById("btnSignOut");
+
+            if (viewId === 'clientDashboardView' || viewId === 'ownerDashboardView') {
+                btnOwner.classList.add('hidden');
+                btnSignOut.classList.remove('hidden');
+            } else {
+                btnOwner.classList.remove('hidden');
+                btnSignOut.classList.add('hidden');
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem("activeEspUser");
+            activeAccount = null;
+            activeAdminKey = null;
+            showView('clientLoginView');
+        }
+
+        // -------------------------------------------------------------
+        // CLIENT AUTHENTICATION & DASHBOARD
+        // -------------------------------------------------------------
+        async function handleClientLogin(e) {
             e.preventDefault();
-            const email = document.getElementById("loginEmail").value.trim().toLowerCase();
-            const password = document.getElementById("loginPassword").value;
-            const errorMsg = document.getElementById("loginErrorMsg");
+            const email = document.getElementById("clientEmail").value;
+            const password = document.getElementById("clientPassword").value;
+            const errEl = document.getElementById("clientLoginError");
+            errEl.classList.add("hidden");
 
             try {
                 const res = await fetch(`${API_URL}/login`, {
@@ -166,332 +239,251 @@
                 if (data.success) {
                     activeAccount = data.user;
                     localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
-                    errorMsg.style.display = "none";
-                    openDashboard();
+                    showClientDashboard();
                 } else {
-                    errorMsg.innerText = data.message;
-                    errorMsg.style.display = "block";
+                    errEl.innerText = data.message || "Invalid credentials.";
+                    errEl.classList.remove("hidden");
                 }
             } catch (err) {
-                errorMsg.innerText = "Cannot connect to server!";
-                errorMsg.style.display = "block";
+                errEl.innerText = "Cannot connect to backend server!";
+                errEl.classList.remove("hidden");
             }
-        });
+        }
 
-        // ADMIN FUNCTIONS
-        async function verifyAdminKey() {
-            const keyInput = document.getElementById("adminKeyInput").value;
-            const authError = document.getElementById("adminAuthError");
+        function showClientDashboard() {
+            showView('clientDashboardView');
+            document.getElementById("clientTitleHeader").innerText = activeAccount.title || "My Devices";
+            document.getElementById("clientEmailSub").innerText = activeAccount.email;
+
+            renderClientButtons();
+            
+            // Subscribe to status topics for assigned buttons
+            if (activeAccount.buttons && client && client.isConnected()) {
+                activeAccount.buttons.forEach(btn => {
+                    if (btn.subTopic) client.subscribe(btn.subTopic);
+                });
+            }
+        }
+
+        function renderClientButtons() {
+            const container = document.getElementById("buttonsContainer");
+            const noDev = document.getElementById("noDevicesMsg");
+            container.innerHTML = "";
+
+            if (!activeAccount.buttons || activeAccount.buttons.length === 0) {
+                noDev.classList.remove("hidden");
+                return;
+            }
+
+            noDev.classList.add("hidden");
+
+            activeAccount.buttons.forEach((btn, index) => {
+                const card = document.createElement("div");
+                card.className = "device-card";
+                card.innerHTML = `
+                    <h3>${btn.name}</h3>
+                    <p class="mac-label">MAC: ${btn.mac || 'N/A'}</p>
+                    <button id="btn_${btn.id}" class="toggle-btn ${btn.state ? 'btn-on' : 'btn-off'}" onclick="toggleDeviceState('${btn.id}', ${index})">
+                        ${btn.state ? 'ON' : 'OFF'}
+                    </button>
+                    <br>
+                    <button class="btn-danger" onclick="deleteDevice('${btn.id}', ${index})">✕ Delete Device</button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function toggleDeviceState(buttonId, index) {
+            const buttonObj = activeAccount.buttons[index];
+            buttonObj.state = !buttonObj.state;
+
+            updateButtonUI(buttonId, buttonObj.state);
+
+            if (client && client.isConnected() && buttonObj.pubTopic) {
+                const message = new Paho.MQTT.Message(buttonObj.state ? "1" : "0");
+                message.destinationName = buttonObj.pubTopic;
+                client.send(message);
+            }
+        }
+
+        function updateButtonUI(buttonId, state) {
+            const btnEl = document.getElementById(`btn_${buttonId}`);
+            if (btnEl) {
+                btnEl.innerText = state ? "ON" : "OFF";
+                btnEl.className = `toggle-btn ${state ? 'btn-on' : 'btn-off'}`;
+            }
+        }
+
+        async function deleteDevice(buttonId, index) {
+            if (!confirm("Are you sure you want to remove this device?")) return;
+
+            // 1. Send MQTT Delete payload to ESP32
+            if (client && client.isConnected()) {
+                const deletePayload = JSON.stringify({ action: "delete", index: index });
+                let delMsg = new Paho.Message(deletePayload);
+                delMsg.destinationName = "esp32/setup/delete";
+                client.send(delMsg);
+            }
+
+            // 2. Sync deletion with Express backend server
+            try {
+                await fetch(`${API_URL}/client/delete-button`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: activeAccount.email, buttonId: buttonId })
+                });
+            } catch (err) {
+                console.warn("Backend dynamic deletion route offline, removing locally.");
+            }
+
+            // 3. Remove local state and re-render
+            activeAccount.buttons.splice(index, 1);
+            localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
+            renderClientButtons();
+        }
+
+        // -------------------------------------------------------------
+        // OWNER / ADMIN PANEL ACTIONS
+        // -------------------------------------------------------------
+        async function handleOwnerLogin(e) {
+            e.preventDefault();
+            const adminKey = document.getElementById("ownerSecretKey").value;
+            const errEl = document.getElementById("ownerLoginError");
+            errEl.classList.add("hidden");
 
             try {
                 const res = await fetch(`${API_URL}/admin/users`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminKey: keyInput })
+                    body: JSON.stringify({ adminKey })
                 });
                 const data = await res.json();
 
                 if (data.success) {
-                    currentAdminKey = keyInput;
-                    authError.style.display = "none";
-                    document.getElementById("adminAuthBox").style.display = "none";
-                    document.getElementById("adminControls").style.display = "block";
-                    renderUserList(data.users);
+                    activeAdminKey = adminKey;
+                    showView('ownerDashboardView');
+                    populateAdminUsersTable(data.users);
                 } else {
-                    authError.innerText = data.message;
-                    authError.style.display = "block";
+                    errEl.innerText = data.message || "Invalid owner secret key!";
+                    errEl.classList.remove("hidden");
                 }
             } catch (err) {
-                authError.innerText = "Cannot connect to backend server!";
-                authError.style.display = "block";
+                errEl.innerText = "Cannot connect to backend server!";
+                errEl.classList.remove("hidden");
             }
         }
 
-        function renderUserList(users) {
-            const container = document.getElementById("userListContainer");
-            if (users.length === 0) {
-                container.innerHTML = "<p style='color: #888;'>No clients added yet.</p>";
-                return;
-            }
+        function populateAdminUsersTable(users) {
+            const tbody = document.getElementById("usersTableBody");
+            const select = document.getElementById("targetClientSelect");
 
-            let html = "<table class='admin-table'><tr><th>Email</th><th>Device Name</th><th>Action</th></tr>";
-            users.forEach(u => {
-                html += `<tr>
-                    <td><strong>${u.email}</strong></td>
-                    <td>${u.title}</td>
-                    <td><button class='deleteBtn' onclick="deleteUser('${u.email}')">Delete User</button></td>
-                </tr>`;
-            });
-            html += "</table>";
-            container.innerHTML = html;
-        }
+            tbody.innerHTML = "";
+            select.innerHTML = `<option value="" disabled selected>Select Client Account</option>`;
 
-        async function deleteUser(email) {
-            if (!confirm(`Are you sure you want to delete user: ${email}?`)) return;
-            try {
-                const res = await fetch(`${API_URL}/admin/delete-user`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminKey: currentAdminKey, targetEmail: email })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    verifyAdminKey();
-                } else {
-                    alert(data.message);
-                }
-            } catch (err) {
-                alert("Failed to delete user.");
-            }
-        }
-
-        // QR SCANNER PAIRING
-        async function registerNewButton(targetEmail, buttonName, pubTopic, subTopic, macAddr = "") {
-            try {
-                const res = await fetch(`${API_URL}/admin/add-button`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminKey: currentAdminKey, targetEmail, buttonName, pubTopic, subTopic, macAddr })
-                });
-                const data = await res.json();
-
-                if (data.success) {
-                    if (client && client.isConnected()) {
-                        const configPayload = JSON.stringify({
-                            name: buttonName,
-                            pubTopic: pubTopic,
-                            subTopic: subTopic,
-                            mac: macAddr
-                        });
-                        let configMsg = new Paho.Message(configPayload);
-                        configMsg.destinationName = "esp32/setup/config";
-                        client.send(configMsg);
-                    }
-                    return true;
-                } else {
-                    alert(data.message);
-                    return false;
-                }
-            } catch (err) {
-                alert("Server error!");
-                return false;
-            }
-        }
-
-        function toggleQrScanner() {
-            const qrDiv = document.getElementById("qrReader");
-            if (qrDiv.style.display === "none") {
-                qrDiv.style.display = "block";
-                html5QrCodeScanner = new Html5Qrcode("qrReader");
-                html5QrCodeScanner.start(
-                    { facingMode: "environment" },
-                    { fps: 10, qrbox: 250 },
-                    onQrCodeScanned
-                ).catch(err => alert("Camera access error: " + err));
-            } else {
-                stopQrScanner();
-            }
-        }
-
-        function stopQrScanner() {
-            if (html5QrCodeScanner) {
-                html5QrCodeScanner.stop().then(() => {
-                    document.getElementById("qrReader").style.display = "none";
-                });
-            }
-        }
-
-        async function onQrCodeScanned(decodedText) {
-            stopQrScanner();
-            try {
-                const qrData = JSON.parse(decodedText);
-                if (qrData.pubTopic && qrData.subTopic) {
-                    const success = await registerNewButton(
-                        activeAccount.email,
-                        qrData.name || "New Device",
-                        qrData.pubTopic,
-                        qrData.subTopic,
-                        qrData.mac || ""
-                    );
-                    if (success) {
-                        alert("Device paired and added successfully!");
-                        window.location.reload();
-                    }
-                } else {
-                    alert("Invalid device QR code payload format.");
-                }
-            } catch (e) {
-                alert("Scanned QR code is not valid JSON device data.");
-            }
-        }
-
-        // CLIENT DASHBOARD & MQTT SETUP
-        function openDashboard() {
-            loginSection.style.display = "none";
-            ownerSection.style.display = "none";
-            controlSection.style.display = "flex";
-            logoutBtn.style.display = "block";
-            document.getElementById("deviceHeader").innerText = activeAccount.title;
-
-            renderClientButtons();
-            initMqttConnection();
-        }
-
-        function renderClientButtons() {
-            const container = document.getElementById("clientButtonsContainer");
-            container.innerHTML = "";
-
-            if (!activeAccount.buttons || activeAccount.buttons.length === 0) {
-                container.innerHTML = "<p style='color:#888;'>No control buttons assigned. Click the + button to pair a device.</p>";
-                return;
-            }
-
-            activeAccount.buttons.forEach((b, index) => {
-                buttonStates[b.id] = false;
-                container.innerHTML += `
-                    <div class="device-card">
-                        <h3>${b.name}</h3>
-                        <button id="btn_${b.id}" class="authBtn appliance-btn" 
-                                onmousedown="startHold('${b.id}')" 
-                                onmouseup="endHold('${b.id}', '${b.pubTopic}')" 
-                                onmouseleave="cancelHold()"
-                                ontouchstart="startHold('${b.id}')" 
-                                ontouchend="endHold('${b.id}', '${b.pubTopic}')"
-                                ontouchcancel="cancelHold()">Connecting...</button>
-                        <button id="delBtn_${b.id}" class="delete-device-btn" style="display: none;" 
-                                onclick="deleteDevice('${b.id}', ${index})">✕ Delete Device</button>
-                    </div>
+            users.forEach(user => {
+                // Fill Table
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>${user.email}</td>
+                    <td>${user.title}</td>
+                    <td>${user.buttonCount} Device(s)</td>
+                    <td><button class="btn-danger-sm" onclick="handleDeleteUser('${user.email}')">Delete</button></td>
                 `;
+                tbody.appendChild(tr);
+
+                // Fill Select Dropdown
+                const opt = document.createElement("option");
+                opt.value = user.email;
+                opt.innerText = `${user.title} (${user.email})`;
+                select.appendChild(opt);
             });
         }
 
-        // HOLD GESTURE LOGIC
-        function startHold(buttonId) {
-            isHoldTriggered = false;
-            holdTimer = setTimeout(() => {
-                isHoldTriggered = true;
-                const delBtn = document.getElementById(`delBtn_${buttonId}`);
-                if (delBtn) {
-                    delBtn.style.display = (delBtn.style.display === "none") ? "block" : "none";
-                }
-            }, 1000); // 1.0 second hold duration
+        async function refreshAdminUsers() {
+            if (!activeAdminKey) return;
+            const res = await fetch(`${API_URL}/admin/users`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ adminKey: activeAdminKey })
+            });
+            const data = await res.json();
+            if (data.success) populateAdminUsersTable(data.users);
         }
 
-        function endHold(buttonId, pubTopic) {
-            clearTimeout(holdTimer);
-            if (!isHoldTriggered) {
-                toggleAppliance(buttonId, pubTopic);
+        async function handleCreateUser(e) {
+            e.preventDefault();
+            const email = document.getElementById("newClientEmail").value;
+            const password = document.getElementById("newClientPassword").value;
+            const title = document.getElementById("newClientTitle").value;
+
+            const res = await fetch(`${API_URL}/admin/add-user`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ adminKey: activeAdminKey, email, password, title })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                alert("Client account created successfully!");
+                e.target.reset();
+                refreshAdminUsers();
+            } else {
+                alert(data.message || "Failed to create account.");
             }
         }
 
-        function cancelHold() {
-            clearTimeout(holdTimer);
-        }
+        async function handleAddButtonToUser(e) {
+            e.preventDefault();
+            const targetEmail = document.getElementById("targetClientSelect").value;
+            const buttonName = document.getElementById("newBtnName").value;
+            const pubTopic = document.getElementById("newPubTopic").value;
+            const subTopic = document.getElementById("newSubTopic").value;
+            const macAddr = document.getElementById("newMacAddr").value;
 
-        // DELETE DEVICE FROM WEB & ESP32
-        async function deleteDevice(buttonId, index) {
-            if (!confirm("Are you sure you want to remove this device from web and ESP32?")) return;
+            const res = await fetch(`${API_URL}/admin/add-button`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetEmail, buttonName, pubTopic, subTopic, macAddr })
+            });
+            const data = await res.json();
 
-            try {
-                // 1. Send MQTT Delete Topic to clear device on ESP32
+            if (data.success) {
+                // Broadcast setup payload over MQTT so ESP32 automatically pairs
                 if (client && client.isConnected()) {
-                    const deletePayload = JSON.stringify({ action: "delete", index: index });
-                    let delMsg = new Paho.Message(deletePayload);
-                    delMsg.destinationName = "esp32/setup/delete";
-                    client.send(delMsg);
-                }
-
-                // 2. Backend Delete API call
-                const res = await fetch(`${API_URL}/client/delete-button`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: activeAccount.email, buttonId: buttonId })
-                });
-                const data = await res.json();
-
-                if (data.success) {
-                    activeAccount.buttons = activeAccount.buttons.filter(b => b.id !== buttonId);
-                    localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
-                    renderClientButtons();
-                } else {
-                    alert("Failed to delete device from server.");
-                }
-            } catch (err) {
-                alert("Error deleting device.");
-            }
-        }
-
-        function initMqttConnection() {
-            const uniqueClientId = "web_client_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
-            client = new Paho.Client(broker, Number(port), "/mqtt", uniqueClientId);
-            
-            client.onMessageArrived = (msg) => {
-                if (activeAccount.buttons) {
-                    const matchedBtn = activeAccount.buttons.find(b => b.subTopic === msg.destinationName);
-                    if (matchedBtn) {
-                        const state = (msg.payloadString === "1");
-                        buttonStates[matchedBtn.id] = state;
-                        const btnEl = document.getElementById(`btn_${matchedBtn.id}`);
-                        if (btnEl) {
-                            btnEl.innerText = state ? "ON" : "OFF";
-                        }
-                    }
-                }
-            };
-
-            client.onConnectionLost = () => { 
-                if (activeAccount.buttons) {
-                    activeAccount.buttons.forEach(b => {
-                        const btnEl = document.getElementById(`btn_${b.id}`);
-                        if (btnEl) btnEl.innerText = "Reconnecting...";
+                    const setupPayload = JSON.stringify({
+                        name: buttonName,
+                        pubTopic: pubTopic,
+                        subTopic: subTopic,
+                        mac: macAddr
                     });
+                    let msg = new Paho.Message(setupPayload);
+                    msg.destinationName = "esp32/setup/config";
+                    client.send(msg);
                 }
-            };
 
-            client.connect({
-                useSSL: true,
-                cleanSession: true,
-                timeout: 10,
-                onSuccess: () => {
-                    if (activeAccount.buttons) {
-                        activeAccount.buttons.forEach(b => {
-                            if (b.subTopic) client.subscribe(b.subTopic);
-                            const btnEl = document.getElementById(`btn_${b.id}`);
-                            if (btnEl) {
-                                btnEl.innerText = "OFF";
-                            }
-                        });
-                    }
-                }
-            });
-        }
-
-        function toggleAppliance(buttonId, pubTopic) {
-            if (!client || !client.isConnected()) return;
-
-            let currentState = buttonStates[buttonId] || false;
-            let nextState = currentState ? "0" : "1";
-            
-            let message = new Paho.Message(nextState);
-            message.destinationName = pubTopic;
-            client.send(message);
-
-            buttonStates[buttonId] = (nextState === "1");
-            const btnEl = document.getElementById(`btn_${buttonId}`);
-            if (btnEl) {
-                btnEl.innerText = buttonStates[buttonId] ? "ON" : "OFF";
+                alert("Device button paired and transmitted to ESP32!");
+                e.target.reset();
+                refreshAdminUsers();
+            } else {
+                alert(data.message || "Failed to pair device.");
             }
         }
 
-        function logout() {
-            localStorage.removeItem("activeEspUser");
-            if (client && client.isConnected()) client.disconnect();
-            activeAccount = null;
-            
-            controlSection.style.display = "none";
-            logoutBtn.style.display = "none";
-            loginSection.style.display = "flex";
-            document.getElementById("loginForm").reset();
+        async function handleDeleteUser(targetEmail) {
+            if (!confirm(`Are you sure you want to delete account ${targetEmail}?`)) return;
+
+            const res = await fetch(`${API_URL}/admin/delete-user`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ adminKey: activeAdminKey, targetEmail })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                refreshAdminUsers();
+            } else {
+                alert(data.message || "Failed to delete account.");
+            }
         }
     </script>
 </body>
