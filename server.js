@@ -18,7 +18,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// SAFE USER LOADER: Always guarantees an Array return
+// Safe JSON loader to prevent crashing
 function loadUsers() {
     if (!fs.existsSync(DATA_FILE)) {
         fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2));
@@ -30,7 +30,7 @@ function loadUsers() {
         const parsed = JSON.parse(data);
         return Array.isArray(parsed) ? parsed : [];
     } catch (err) {
-        console.error("Error reading users.json, resetting to empty array:", err);
+        console.error("Error reading users.json:", err);
         return [];
     }
 }
@@ -49,13 +49,10 @@ function saveUsers(users) {
 // API ENDPOINTS
 // -------------------------------------------------------------
 
+// Client Login
 app.post('/api/login', (req, res) => {
     const { email, password } = req.body;
     const users = loadUsers();
-
-    if (!Array.isArray(users)) {
-        return res.status(500).json({ success: false, message: "Database error." });
-    }
 
     const user = users.find(u => u && u.email && u.email.toLowerCase() === (email || '').toLowerCase().trim() && u.password === password);
 
@@ -68,6 +65,7 @@ app.post('/api/login', (req, res) => {
     return res.status(401).json({ success: false, message: "Invalid email or password." });
 });
 
+// Admin: Authenticate & Get Users List
 app.post('/api/admin/users', (req, res) => {
     const { adminKey } = req.body;
     if (adminKey !== OWNER_SECRET_KEY) {
@@ -82,6 +80,7 @@ app.post('/api/admin/users', (req, res) => {
     return res.json({ success: true, users: sanitized });
 });
 
+// Admin: Create Client Account
 app.post('/api/admin/add-user', (req, res) => {
     const { adminKey, email, password, title } = req.body;
     if (adminKey !== OWNER_SECRET_KEY) return res.status(403).json({ success: false, message: "Unauthorized." });
@@ -98,6 +97,7 @@ app.post('/api/admin/add-user', (req, res) => {
     return res.json({ success: true, message: "User created." });
 });
 
+// Admin: Delete Client Account
 app.post('/api/admin/delete-user', (req, res) => {
     const { adminKey, targetEmail } = req.body;
     if (adminKey !== OWNER_SECRET_KEY) return res.status(403).json({ success: false, message: "Unauthorized." });
@@ -108,6 +108,7 @@ app.post('/api/admin/delete-user', (req, res) => {
     return res.json({ success: true, message: "User deleted." });
 });
 
+// Admin: Pair Device to Client Account
 app.post('/api/admin/add-button', (req, res) => {
     const { targetEmail, buttonName, pubTopic, subTopic, macAddr } = req.body;
     let users = loadUsers();
@@ -131,6 +132,31 @@ app.post('/api/admin/add-button', (req, res) => {
     return res.json({ success: true, button: newBtn });
 });
 
+// Client: Pair Device via QR Code
+app.post('/api/client/add-button-qr', (req, res) => {
+    const { email, buttonName, pubTopic, subTopic, macAddr } = req.body;
+    let users = loadUsers();
+    
+    const idx = users.findIndex(u => u.email && u.email.toLowerCase() === (email || '').toLowerCase().trim());
+    if (idx === -1) return res.status(404).json({ success: false, message: "User account not found." });
+
+    if (!Array.isArray(users[idx].buttons)) users[idx].buttons = [];
+
+    const newBtn = {
+        id: "btn_" + Date.now(),
+        name: buttonName || "ESP32 Device",
+        pubTopic: pubTopic || "",
+        subTopic: subTopic || "",
+        mac: macAddr || "FF:FF:FF:FF:FF:FF",
+        state: false
+    };
+
+    users[idx].buttons.push(newBtn);
+    saveUsers(users);
+    return res.json({ success: true, button: newBtn });
+});
+
+// Client: Remove Device
 app.post('/api/client/delete-button', (req, res) => {
     const { email, buttonId } = req.body;
     let users = loadUsers();
