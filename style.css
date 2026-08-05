@@ -1,7 +1,6 @@
 /* =============================================================
-   1. GLOBAL RESETS & ESSENTIAL VIEW CONTROL
+   1. ESSENTIAL VIEW CONTROL & GLOBAL RESETS
    ============================================================= */
-/* Hides inactive views and sections */
 .hidden {
     display: none !important;
 }
@@ -13,88 +12,95 @@
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #0d1117;
-    color: #c9d1d9;
-    line-height: 1.6;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: #000000;
+    color: #ffffff;
     min-height: 100vh;
 }
 
 /* =============================================================
-   2. TOP NAVIGATION HEADER
+   2. TOP HEADER
    ============================================================= */
 .header-bar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 15px 30px;
-    background-color: #161b22;
-    border-bottom: 1px solid #30363d;
+    padding: 20px 30px;
+    background-color: #000000;
 }
 
 .logo-title {
-    color: #58a6ff;
-    font-size: 1.8rem;
-    font-weight: 700;
+    color: #00aaff;
+    font-size: 2rem;
+    font-weight: 800;
     letter-spacing: 1px;
 }
 
 #navRightControls button {
+    background-color: #222;
+    color: #fff;
+    border: 1px solid #444;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
     margin-left: 10px;
 }
 
+#navRightControls button:hover {
+    background-color: #333;
+}
+
 /* =============================================================
-   3. LAYOUT & CARD CONTAINERS
+   3. MAIN CONTAINER & CARD VIEWS
    ============================================================= */
 .main-container {
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 40px 20px;
-    min-height: calc(100vh - 80px);
+    padding: 20px;
+    min-height: calc(100vh - 100px);
 }
 
 .card-view {
-    background-color: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 8px;
-    padding: 30px;
+    background-color: #000000;
     width: 100%;
-    max-width: 500px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    max-width: 420px;
+    margin: 0 auto;
+    text-align: center;
 }
 
-/* Expand max width when inside Owner Admin Dashboard */
 #ownerDashboardView {
-    max-width: 900px;
+    max-width: 700px;
 }
 
 .card-view h2 {
-    color: #f0f6fc;
-    margin-bottom: 15px;
-    font-size: 1.5rem;
-    text-align: center;
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: #ffffff;
 }
 
 hr {
     border: 0;
     height: 1px;
-    background: #30363d;
+    background: #222;
     margin: 20px 0;
 }
 
 /* =============================================================
-   4. FORM ELEMENTS & INPUTS
+   4. FORM INPUTS & BUTTONS
    ============================================================= */
 .input-group {
     margin-bottom: 15px;
+    text-align: left;
 }
 
 .input-group label {
     display: block;
-    margin-bottom: 5px;
+    margin-bottom: 6px;
     font-size: 0.9rem;
-    color: #8b949e;
+    color: #ccc;
 }
 
 input[type="text"],
@@ -102,138 +108,134 @@ input[type="email"],
 input[type="password"],
 select {
     width: 100%;
-    padding: 10px 12px;
-    background-color: #0d1117;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    color: #c9d1d9;
+    padding: 14px 16px;
+    background-color: #111111;
+    border: 1px solid #222222;
+    border-radius: 10px;
+    color: #ffffff;
     font-size: 0.95rem;
     outline: none;
-    transition: border-color 0.2s ease;
 }
 
 input:focus, select:focus {
-    border-color: #58a6ff;
+    border-color: #00aaff;
 }
 
-/* =============================================================
-   5. BUTTON STYLES
-   ============================================================= */
-button {
-    font-family: inherit;
-    font-size: 0.95rem;
-    font-weight: 600;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background-color 0.2s ease, opacity 0.2s ease;
-    border: none;
-}
-
+/* Rounded Action Buttons */
 .btn-primary {
     width: 100%;
-    padding: 12px;
-    background-color: #238636;
+    padding: 14px;
+    background-color: #00aaff;
     color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
     margin-top: 10px;
 }
 
 .btn-primary:hover {
-    background-color: #2ea043;
+    background-color: #0088cc;
 }
 
 .btn-secondary {
-    padding: 8px 16px;
-    background-color: #21262d;
-    color: #c9d1d9;
-    border: 1px solid #30363d;
+    width: 100%;
+    padding: 12px;
+    background-color: #1a1a1a;
+    color: #00aaff;
+    border: 1px solid #00aaff;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
 }
 
 .btn-secondary:hover {
-    background-color: #30363d;
+    background-color: #00aaff;
+    color: #ffffff;
 }
 
 .btn-danger {
     padding: 8px 12px;
-    background-color: #da3633;
+    background-color: #ff3333;
     color: #ffffff;
-    margin-top: 10px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
     font-size: 0.85rem;
-}
-
-.btn-danger:hover {
-    background-color: #b62324;
+    margin-top: 10px;
 }
 
 .btn-danger-sm {
-    padding: 4px 8px;
-    background-color: #da3633;
+    padding: 4px 10px;
+    background-color: #ff3333;
     color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
     font-size: 0.8rem;
 }
 
-/* Device Toggle Switch States */
+/* Device Toggle Button */
 .toggle-btn {
     width: 100%;
-    padding: 15px;
+    padding: 16px;
     font-size: 1.2rem;
-    letter-spacing: 1px;
+    font-weight: bold;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
     margin-top: 10px;
 }
 
 .btn-on {
-    background-color: #238636;
+    background-color: #00cc66;
     color: #ffffff;
-}
-
-.btn-on:hover {
-    background-color: #2ea043;
 }
 
 .btn-off {
-    background-color: #da3633;
+    background-color: #ff3333;
     color: #ffffff;
 }
 
-.btn-off:hover {
-    background-color: #b62324;
-}
-
 /* =============================================================
-   6. DEVICE GRID & ADMIN TABLES
+   5. DEVICE GRID & ADMIN TABLES
    ============================================================= */
 .device-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 15px;
     margin-top: 20px;
 }
 
 .device-card {
-    background-color: #0d1117;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    padding: 15px;
+    background-color: #111111;
+    border: 1px solid #222222;
+    border-radius: 12px;
+    padding: 20px;
     text-align: center;
 }
 
 .mac-label {
-    font-size: 0.75rem;
-    color: #8b949e;
-    margin: 5px 0 10px 0;
+    font-size: 0.8rem;
+    color: #777777;
+    margin: 6px 0;
 }
 
 .admin-block {
-    background-color: #0d1117;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    padding: 15px;
+    background-color: #111111;
+    border: 1px solid #222222;
+    border-radius: 12px;
+    padding: 20px;
     margin-bottom: 20px;
+    text-align: left;
 }
 
 .admin-block h3 {
     font-size: 1.1rem;
-    color: #f0f6fc;
-    margin-bottom: 10px;
+    color: #ffffff;
+    margin-bottom: 12px;
 }
 
 .admin-block form {
@@ -246,38 +248,37 @@ button {
     width: 100%;
     border-collapse: collapse;
     margin-top: 10px;
-    text-align: left;
 }
 
 .admin-table th, .admin-table td {
-    padding: 10px;
-    border-bottom: 1px solid #30363d;
+    padding: 12px;
+    border-bottom: 1px solid #222222;
+    text-align: left;
     font-size: 0.9rem;
 }
 
 .admin-table th {
-    color: #8b949e;
+    color: #777777;
 }
 
-/* Messages & Links */
+/* Links & Messages */
 .error-msg {
-    color: #f85149;
+    color: #ff4d4d;
     font-size: 0.85rem;
-    margin-top: 10px;
-    text-align: center;
+    margin-top: 12px;
 }
 
 .info-msg {
-    text-align: center;
-    color: #8b949e;
+    color: #888888;
     margin-top: 20px;
 }
 
 .link-back {
     display: inline-block;
-    color: #58a6ff;
+    color: #00aaff;
     text-decoration: none;
     font-size: 0.9rem;
+    margin-top: 15px;
 }
 
 .link-back:hover {
