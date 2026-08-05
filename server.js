@@ -1,4 +1,3 @@
-//node server.js
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -9,13 +8,20 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'users.json');
 
-// Configuration
-const OWNER_SECRET_KEY = "khaled_123_123"; // Change this to your desired secret key
+// Admin Key Configuration
+const OWNER_SECRET_KEY = "admin123";
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+
+// Serves index.html and static files directly from root directory
 app.use(express.static(__dirname));
+
+// Direct root route to serve main frontend
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // -------------------------------------------------------------
 // HELPER FUNCTIONS FOR FILE I/O
@@ -60,7 +66,6 @@ app.post('/api/login', (req, res) => {
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase().trim() && u.password === password);
 
     if (user) {
-        // Exclude sensitive internal data if necessary
         return res.json({
             success: true,
             user: {
@@ -74,7 +79,7 @@ app.post('/api/login', (req, res) => {
     }
 });
 
-// 2. ADMIN: AUTHENTICATE & FETCH USER LIST
+// 2. ADMIN: AUTHENTICATE & FETCH CLIENT LIST
 app.post('/api/admin/users', (req, res) => {
     const { adminKey } = req.body;
 
@@ -150,7 +155,7 @@ app.post('/api/admin/delete-user', (req, res) => {
     }
 });
 
-// 5. REGISTER / ADD DEVICE BUTTON TO CLIENT (via QR Code or Form)
+// 5. ADMIN: PAIR DEVICE BUTTON TO CLIENT
 app.post('/api/admin/add-button', (req, res) => {
     const { targetEmail, buttonName, pubTopic, subTopic, macAddr } = req.body;
 
@@ -174,7 +179,8 @@ app.post('/api/admin/add-button', (req, res) => {
         name: buttonName || "New Appliance",
         pubTopic: pubTopic,
         subTopic: subTopic,
-        mac: macAddr || "FF:FF:FF:FF:FF:FF"
+        mac: macAddr || "FF:FF:FF:FF:FF:FF",
+        state: false
     };
 
     users[userIndex].buttons.push(newButton);
@@ -213,7 +219,7 @@ app.post('/api/client/delete-button', (req, res) => {
     if (saveUsers(users)) {
         return res.json({ success: true, message: "Device deleted successfully." });
     } else {
-        return res.status(500).json({ success: false, message: "Failed to delete device from server storage." });
+        return res.status(500).json({ success: false, message: "Failed to delete device from storage." });
     }
 });
 
@@ -224,6 +230,5 @@ app.listen(PORT, () => {
     console.log(`=================================`);
     console.log(`ESP32 Controller Server Running  `);
     console.log(`Port: ${PORT}                    `);
-    console.log(`URL: http://localhost:${PORT}     `);
     console.log(`=================================`);
 });
