@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'users.json');
 
 // Configuration
-const OWNER_SECRET_KEY = "admin123"; // Change this to your desired secret key
+const OWNER_SECRET_KEY = "khaled_123_123"; // Change this to your desired secret key
 
 // Middleware
 app.use(cors());
