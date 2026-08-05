@@ -1,180 +1,229 @@
-// node server.js
-// server.js
+//node server.js
 const express = require('express');
 const cors = require('cors');
+const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
+
 const app = express();
+const PORT = process.env.PORT || 3000;
+const DATA_FILE = path.join(__dirname, 'users.json');
 
+// Configuration
+const OWNER_SECRET_KEY = "admin123"; // Change this to your desired secret key
+
+// Middleware
 app.use(cors());
-app.use(express.json());
-
-// Serve static web files (index.html, css, js) from current directory
+app.use(bodyParser.json());
 app.use(express.static(__dirname));
 
-const DB_FILE = 'users.json';
-const ADMIN_SECRET = process.env.ADMIN_SECRET || 'khaled_123_123';
-
-// Helper: Read users from JSON file
-function getUsers() {
-    if (!fs.existsSync(DB_FILE)) return {};
+// -------------------------------------------------------------
+// HELPER FUNCTIONS FOR FILE I/O
+// -------------------------------------------------------------
+function loadUsers() {
+    if (!fs.existsSync(DATA_FILE)) {
+        fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2));
+        return [];
+    }
     try {
-        return JSON.parse(fs.readFileSync(DB_FILE));
+        const data = fs.readFileSync(DATA_FILE, 'utf8');
+        return JSON.parse(data || '[]');
     } catch (err) {
-        return {};
+        console.error("Error reading users.json:", err);
+        return [];
     }
 }
 
-// Helper: Save users to JSON file
 function saveUsers(users) {
-    fs.writeFileSync(DB_FILE, JSON.stringify(users, null, 2));
+    try {
+        fs.writeFileSync(DATA_FILE, JSON.stringify(users, null, 2));
+        return true;
+    } catch (err) {
+        console.error("Error writing users.json:", err);
+        return false;
+    }
 }
 
-// ------------------------------------
-// 1. CLIENT LOGIN ENDPOINT
-// ------------------------------------
+// -------------------------------------------------------------
+// API ENDPOINTS
+// -------------------------------------------------------------
+
+// 1. CLIENT LOGIN
 app.post('/api/login', (req, res) => {
     const { email, password } = req.body;
-    const users = getUsers();
 
-    if (users[email] && users[email].password === password) {
-        const { password: _, ...userData } = users[email];
-        userData.email = email; 
-        // Ensure buttons array exists
-        userData.buttons = userData.buttons || [];
-        res.json({ success: true, user: userData });
+    if (!email || !password) {
+        return res.status(400).json({ success: false, message: "Email and password are required." });
+    }
+
+    const users = loadUsers();
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase().trim() && u.password === password);
+
+    if (user) {
+        // Exclude sensitive internal data if necessary
+        return res.json({
+            success: true,
+            user: {
+                email: user.email,
+                title: user.title,
+                buttons: user.buttons || []
+            }
+        });
     } else {
-        res.status(401).json({ success: false, message: 'Invalid email or password!' });
+        return res.status(401).json({ success: false, message: "Invalid email or password." });
     }
 });
 
-// ------------------------------------
-// 2. ADMIN: GET ALL USERS
-// ------------------------------------
+// 2. ADMIN: AUTHENTICATE & FETCH USER LIST
 app.post('/api/admin/users', (req, res) => {
     const { adminKey } = req.body;
-    if (adminKey !== ADMIN_SECRET) {
-        return res.status(403).json({ success: false, message: 'Unauthorized: Invalid Admin Key!' });
+
+    if (adminKey !== OWNER_SECRET_KEY) {
+        return res.status(403).json({ success: false, message: "Invalid owner secret key!" });
     }
 
-    const users = getUsers();
-    const safeUsers = Object.keys(users).map(email => ({
-        email: email,
-        title: users[email].title,
-        buttons: users[email].buttons || []
+    const users = loadUsers();
+    const sanitizedUsers = users.map(u => ({
+        email: u.email,
+        title: u.title,
+        buttonCount: u.buttons ? u.buttons.length : 0
     }));
 
-    res.json({ success: true, users: safeUsers });
+    return res.json({ success: true, users: sanitizedUsers });
 });
 
-// ------------------------------------
-// 3. ADMIN: ADD NEW CLIENT USER
-// ------------------------------------
+// 3. ADMIN: ADD NEW CLIENT ACCOUNT
 app.post('/api/admin/add-user', (req, res) => {
     const { adminKey, email, password, title } = req.body;
-    
-    if (adminKey !== ADMIN_SECRET) {
-        return res.status(403).json({ success: false, message: 'Unauthorized: Invalid Admin Key!' });
+
+    if (adminKey !== OWNER_SECRET_KEY) {
+        return res.status(403).json({ success: false, message: "Unauthorized access." });
     }
 
-    const users = getUsers();
-    if (users[email]) {
-        return res.status(400).json({ success: false, message: 'User/Email already exists!' });
+    if (!email || !password || !title) {
+        return res.status(400).json({ success: false, message: "All fields are required." });
     }
 
-    // Initialize with empty array of custom buttons/switches
-    users[email] = { 
-        password, 
-        title: title || 'Client Dashboard', 
-        buttons: [] 
+    const users = loadUsers();
+    const normalizedEmail = email.toLowerCase().trim();
+
+    if (users.some(u => u.email.toLowerCase() === normalizedEmail)) {
+        return res.status(400).json({ success: false, message: "Client email already exists." });
+    }
+
+    const newUser = {
+        email: normalizedEmail,
+        password: password,
+        title: title,
+        buttons: []
     };
-    saveUsers(users);
 
-    res.json({ success: true, message: 'Client account created successfully!' });
+    users.push(newUser);
+
+    if (saveUsers(users)) {
+        return res.json({ success: true, message: "Client account created successfully." });
+    } else {
+        return res.status(500).json({ success: false, message: "Failed to save client data." });
+    }
 });
 
-// ------------------------------------
-// 4. ADMIN: ADD BUTTON TO CLIENT DASHBOARD
-// ------------------------------------
+// 4. ADMIN: DELETE CLIENT ACCOUNT
+app.post('/api/admin/delete-user', (req, res) => {
+    const { adminKey, targetEmail } = req.body;
+
+    if (adminKey !== OWNER_SECRET_KEY) {
+        return res.status(403).json({ success: false, message: "Unauthorized access." });
+    }
+
+    let users = loadUsers();
+    const initialCount = users.length;
+    users = users.filter(u => u.email.toLowerCase() !== targetEmail.toLowerCase().trim());
+
+    if (users.length === initialCount) {
+        return res.status(404).json({ success: false, message: "Target user not found." });
+    }
+
+    if (saveUsers(users)) {
+        return res.json({ success: true, message: "Client account deleted successfully." });
+    } else {
+        return res.status(500).json({ success: false, message: "Failed to update storage." });
+    }
+});
+
+// 5. REGISTER / ADD DEVICE BUTTON TO CLIENT (via QR Code or Form)
 app.post('/api/admin/add-button', (req, res) => {
-    const { adminKey, targetEmail, buttonName, pubTopic, subTopic } = req.body;
+    const { targetEmail, buttonName, pubTopic, subTopic, macAddr } = req.body;
 
-    if (adminKey !== ADMIN_SECRET) {
-        return res.status(403).json({ success: false, message: 'Unauthorized: Invalid Admin Key!' });
+    if (!targetEmail || !pubTopic || !subTopic) {
+        return res.status(400).json({ success: false, message: "Missing required device fields." });
     }
 
-    const users = getUsers();
-    if (!users[targetEmail]) {
-        return res.status(404).json({ success: false, message: 'Client not found!' });
+    let users = loadUsers();
+    const userIndex = users.findIndex(u => u.email.toLowerCase() === targetEmail.toLowerCase().trim());
+
+    if (userIndex === -1) {
+        return res.status(404).json({ success: false, message: "Client account not found." });
     }
 
-    if (!users[targetEmail].buttons) {
-        users[targetEmail].buttons = [];
+    if (!users[userIndex].buttons) {
+        users[userIndex].buttons = [];
     }
 
     const newButton = {
-        id: 'btn_' + Date.now(),
-        name: buttonName || 'Switch Control',
+        id: "btn_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+        name: buttonName || "New Appliance",
         pubTopic: pubTopic,
-        subTopic: subTopic
+        subTopic: subTopic,
+        mac: macAddr || "FF:FF:FF:FF:FF:FF"
     };
 
-    users[targetEmail].buttons.push(newButton);
-    saveUsers(users);
+    users[userIndex].buttons.push(newButton);
 
-    res.json({ success: true, message: 'Button added successfully!', button: newButton });
+    if (saveUsers(users)) {
+        return res.json({ success: true, message: "Device button paired successfully.", button: newButton });
+    } else {
+        return res.status(500).json({ success: false, message: "Failed to save device pairing." });
+    }
 });
 
-// ------------------------------------
-// 5. ADMIN: DELETE BUTTON FROM CLIENT DASHBOARD
-// ------------------------------------
-app.post('/api/admin/delete-button', (req, res) => {
-    const { adminKey, targetEmail, buttonId } = req.body;
+// 6. CLIENT: DELETE DEVICE BUTTON
+app.post('/api/client/delete-button', (req, res) => {
+    const { email, buttonId } = req.body;
 
-    if (adminKey !== ADMIN_SECRET) {
-        return res.status(403).json({ success: false, message: 'Unauthorized: Invalid Admin Key!' });
+    if (!email || !buttonId) {
+        return res.status(400).json({ success: false, message: "Email and Button ID are required." });
     }
 
-    const users = getUsers();
-    if (!users[targetEmail] || !users[targetEmail].buttons) {
-        return res.status(404).json({ success: false, message: 'Client or buttons not found!' });
+    let users = loadUsers();
+    const userIndex = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase().trim());
+
+    if (userIndex === -1) {
+        return res.status(404).json({ success: false, message: "Client account not found." });
     }
 
-    // Filter out the button with matching buttonId
-    users[targetEmail].buttons = users[targetEmail].buttons.filter(btn => btn.id !== buttonId);
-    saveUsers(users);
+    if (users[userIndex].buttons) {
+        const initialLength = users[userIndex].buttons.length;
+        users[userIndex].buttons = users[userIndex].buttons.filter(b => b.id !== buttonId);
 
-    res.json({ success: true, message: 'Button deleted successfully!' });
+        if (users[userIndex].buttons.length === initialLength) {
+            return res.status(404).json({ success: false, message: "Device button not found." });
+        }
+    }
+
+    if (saveUsers(users)) {
+        return res.json({ success: true, message: "Device deleted successfully." });
+    } else {
+        return res.status(500).json({ success: false, message: "Failed to delete device from server storage." });
+    }
 });
 
-// ------------------------------------
-// 6. ADMIN: DELETE CLIENT USER
-// ------------------------------------
-app.post('/api/admin/delete-user', (req, res) => {
-    const { adminKey, email } = req.body;
-
-    if (adminKey !== ADMIN_SECRET) {
-        return res.status(403).json({ success: false, message: 'Unauthorized: Invalid Admin Key!' });
-    }
-
-    const users = getUsers();
-    if (!users[email]) {
-        return res.status(404).json({ success: false, message: 'User not found!' });
-    }
-
-    delete users[email];
-    saveUsers(users);
-
-    res.json({ success: true, message: 'Client account deleted successfully!' });
-});
-
-// Root Route - Serves main page cleanly
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Start Server
-const PORT = process.env.PORT || 3000;
+// -------------------------------------------------------------
+// START SERVER
+// -------------------------------------------------------------
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`=================================`);
+    console.log(`ESP32 Controller Server Running  `);
+    console.log(`Port: ${PORT}                    `);
+    console.log(`URL: http://localhost:${PORT}     `);
+    console.log(`=================================`);
 });
