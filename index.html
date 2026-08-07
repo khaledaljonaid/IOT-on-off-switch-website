@@ -111,9 +111,10 @@
         const broker = "broker.hivemq.com";
         const port = 8884;
         
-        const API_URL = window.location.port === "5500" 
-            ? "http://localhost:3000/api" 
-            : "/api";
+        // Dynamic API URL for Localhost and Render
+        const API_URL = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") 
+            ? `http://${window.location.hostname}:3000/api` 
+            : `${window.location.origin}/api`;
 
         let client = null;
         let activeAccount = null;
@@ -374,7 +375,7 @@
                 if (delBtn) {
                     delBtn.style.display = (delBtn.style.display === "none") ? "block" : "none";
                 }
-            }, 1000); // 1.0 second hold duration
+            }, 1000);
         }
 
         function endHold(buttonId, pubTopic) {
@@ -393,7 +394,6 @@
             if (!confirm("Are you sure you want to remove this device from web and ESP32?")) return;
 
             try {
-                // 1. Send MQTT Delete Topic to clear device on ESP32
                 if (client && client.isConnected()) {
                     const deletePayload = JSON.stringify({ action: "delete", index: index });
                     let delMsg = new Paho.Message(deletePayload);
@@ -401,7 +401,6 @@
                     client.send(delMsg);
                 }
 
-                // 2. Backend Delete API call
                 const res = await fetch(`${API_URL}/client/delete-button`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
