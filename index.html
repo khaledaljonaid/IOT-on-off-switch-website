@@ -1,156 +1,159 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 Controller</title>
+    <title>ESP32 Control</title>
+    <!-- Working MQTT CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/paho-mqtt@1.1.0/paho-mqtt.min.js"></script>
+    <!-- HTML5 QR Code Reader Library -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <link rel="stylesheet" href="style.css">
-    <!-- QR Scanner Library -->
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        /* Additional inline styles for long-press delete button */
+        .device-card {
+            margin: 15px auto;
+            max-width: 300px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .delete-device-btn {
+            background-color: #ef4444;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            font-size: 0.75rem;
+            border-radius: 4px;
+            margin-top: 8px;
+            cursor: pointer;
+            animation: fadeIn 0.2s ease-in-out;
+        }
+
+        .delete-device-btn:hover {
+            background-color: #dc2626;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
 </head>
 <body>
 
-    <!-- Header Controls -->
-    <header class="header-bar">
-        <h1 class="logo-title">KAD</h1>
-        <div id="navRightControls">
-            <button id="navOwnerBtn" onclick="showView('ownerLoginView')">Owner Panel</button>
-            <button id="navSignOutBtn" onclick="signOut()" class="hidden">Sign Out</button>
+    <header>
+        <div class="logo">
+            <img style="width: 140px;" src="Screenshot_2026-07-18_220821-removebg-preview.png" alt="logo">
         </div>
+        <button id="logoutBtn" onclick="logout()" style="display: none;">Sign Out</button>
     </header>
 
-    <div class="main-container">
+    <!-- 1. CLIENT SIGN-IN SECTION -->
+    <div id="loginSection">
+        <div class="form-container">
+            <h1>Sign In</h1>
+            <form id="loginForm">
+                <input type="email" id="loginEmail" placeholder="Email" required><br>
+                <input type="password" id="loginPassword" placeholder="Password" required><br>
+                <button type="submit" class="authBtn">Login</button>
+            </form>
+            <p id="loginErrorMsg" class="error-text" style="display: none;">Invalid credentials!</p>
+            <p class="toggle-text"><span onclick="showOwnerPanel()">Owner Portal</span></p>
+        </div>
+    </div>
 
-        <!-- 1. Client Sign In View -->
-        <div id="clientSignInView" class="card-view">
-            <h2>Client Sign In</h2>
-            <div class="input-group">
-                <label>Email Address</label>
-                <input type="email" id="loginEmail" placeholder="user@example.com">
-            </div>
-            <div class="input-group">
-                <label>Password</label>
-                <input type="password" id="loginPassword" placeholder="••••••••">
-            </div>
-            <p id="loginError" class="error-msg hidden"></p>
-            <button onclick="handleClientLogin()" class="btn-primary">Sign In</button>
+    <!-- 2. OWNER / ADMIN PANEL -->
+    <div id="ownerSection" style="display: none;">
+        <h1>Owner Dashboard</h1>
+        
+        <div id="adminAuthBox">
+            <input type="password" id="adminKeyInput" placeholder="Enter Owner Secret Key"><br>
+            <button class="authBtn" onclick="verifyAdminKey()">Access Admin Panel</button>
+            <p id="adminAuthError" class="error-text" style="display: none;"></p>
         </div>
 
-        <!-- 2. Client Dashboard View -->
-        <div id="clientDashboardView" class="card-view hidden">
-            <h2 id="clientWelcomeTitle">My Devices</h2>
-            
-            <div id="deviceList" class="device-grid"></div>
-
-            <p id="noDevicesMsg" class="info-msg hidden">
-                No paired devices found for this account.<br>Scan a QR code or contact the administrator to add a device.
-            </p>
-
-            <hr>
-
-            <!-- QR Code Scan Section -->
-            <button type="button" onclick="startQrScanner()" class="btn-secondary" style="margin-bottom: 10px;">
-                📷 Scan QR Code to Pair Device
-            </button>
-
-            <div id="qrScannerSection" class="admin-block hidden" style="text-align:center;">
-                <h3>Scan Device QR Code</h3>
-                <div id="qr-reader" style="width: 100%; max-width: 280px; margin: 10px auto;"></div>
-                <button type="button" onclick="stopQrScanner()" class="btn-danger-sm">Cancel Scan</button>
+        <div id="adminControls" style="display: none;">
+            <div class="forms-wrapper">
+                <div class="form-card">
+                    <h2>Add New Client Account</h2>
+                    <form id="adminAddForm">
+                        <input type="email" id="newEmail" placeholder="Client Email" required><br>
+                        <input type="password" id="newPassword" placeholder="Client Password" required><br>
+                        <input type="text" id="newTitle" placeholder="Device Name (e.g. Living Room ESP)" required><br>
+                        <button type="submit" class="authBtn">Add Client</button>
+                    </form>
+                    <p id="adminAddMsg" class="success-text" style="display: none;"></p>
+                </div>
             </div>
+
+            <h2 style="margin-top: 40px;">Existing Clients</h2>
+            <div id="userListContainer"></div>
         </div>
 
-        <!-- 3. Owner Dashboard / Login View -->
-        <div id="ownerLoginView" class="card-view hidden">
-            <h2>Owner Dashboard</h2>
-            <div class="input-group">
-                <label>Secret Admin Key</label>
-                <input type="password" id="adminKeyInput" placeholder="Enter owner key">
-            </div>
-            <p id="adminKeyError" class="error-msg hidden"></p>
-            <button onclick="handleOwnerLogin()" class="btn-primary">Access Admin Panel</button>
-            <a href="#" onclick="showView('clientSignInView'); return false;" class="link-back">← Back to Sign In</a>
-        </div>
+        <p class="toggle-text"><span onclick="showLoginSection()">← Back to Sign In</span></p>
+    </div>
 
-        <!-- 4. Owner Admin Control Panel View -->
-        <div id="ownerDashboardView" class="card-view hidden">
-            <h2>Admin Control Panel</h2>
+    <!-- 3. CLIENT CONTROL SECTION -->
+    <div id="controlSection" style="display: none;">
+        <!-- Top Right Plus Scan Button -->
+        <button class="scan-plus-btn" onclick="toggleQrScanner()" title="Pair Device">+</button>
 
-            <!-- Create Account Block -->
-            <div class="admin-block">
-                <h3>Create New Client Account</h3>
-                <form id="createAccountForm" onsubmit="handleCreateAccount(event)">
-                    <input type="email" id="newEmail" placeholder="Client Email" required>
-                    <input type="password" id="newPassword" placeholder="Account Password" required>
-                    <input type="text" id="newTitle" placeholder="Title/Location (e.g. Living Room)" required>
-                    <button type="submit" class="btn-primary">+ Create Account</button>
-                </form>
-            </div>
+        <h1 id="deviceHeader">Appliance Control</h1>
+        
+        <div id="qrReader" style="width: 100%; max-width: 320px; display: none; margin: 15px auto;"></div>
 
-            <!-- Pair Device Block -->
-            <div class="admin-block">
-                <h3>Pair Device to Client Account</h3>
-                <form id="pairDeviceForm" onsubmit="handlePairDevice(event)">
-                    <select id="userSelect" required>
-                        <option value="">Select Client Account</option>
-                    </select>
-                    <input type="text" id="devName" placeholder="Device Name (e.g. Fan)" required>
-                    <input type="text" id="pubTopic" placeholder="Publish Topic (e.g. home/fan/set)" required>
-                    <input type="text" id="subTopic" placeholder="Subscribe Topic (e.g. home/fan/state)" required>
-                    <input type="text" id="macAddr" placeholder="MAC Address (08:3A:8D:97:...)" required>
-                    <button type="submit" class="btn-primary">+ Pair Device</button>
-                </form>
-            </div>
-
-            <!-- Registered Accounts Table -->
-            <div class="admin-block">
-                <h3>Registered Client Accounts</h3>
-                <table class="admin-table">
-                    <thead>
-                        <tr>
-                            <th>Email</th>
-                            <th>Location/Title</th>
-                            <th>Devices</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="registeredUsersTable"></tbody>
-                </table>
-            </div>
-
-            <a href="#" onclick="showView('clientSignInView'); return false;" class="link-back">← Back to Sign In</a>
-        </div>
-
+        <div id="clientButtonsContainer"></div>
     </div>
 
     <script>
-        const API_URL = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
-            ? `http://${window.location.hostname}:3000/api`
-            : `${window.location.origin}/api`;
+        const broker = "broker.hivemq.com";
+        const port = 8884;
+        
+        const API_URL = window.location.port === "5500" 
+            ? "http://localhost:3000/api" 
+            : "/api";
 
-        let activeAdminKey = "";
-        let html5QrCode = null;
+        let client = null;
+        let activeAccount = null;
+        let buttonStates = {};
+        let currentAdminKey = "";
+        let html5QrCodeScanner = null;
+        
+        // Hold Timer Variables
+        let holdTimer = null;
+        let isHoldTriggered = false;
 
-        function showView(viewId) {
-            const views = ['clientSignInView', 'clientDashboardView', 'ownerLoginView', 'ownerDashboardView'];
-            views.forEach(id => document.getElementById(id).classList.add('hidden'));
-            document.getElementById(viewId).classList.remove('hidden');
+        const loginSection = document.getElementById("loginSection");
+        const ownerSection = document.getElementById("ownerSection");
+        const controlSection = document.getElementById("controlSection");
+        const logoutBtn = document.getElementById("logoutBtn");
 
-            if (viewId === 'clientDashboardView') {
-                document.getElementById('navSignOutBtn').classList.remove('hidden');
-                document.getElementById('navOwnerBtn').classList.add('hidden');
-            } else {
-                document.getElementById('navSignOutBtn').classList.add('hidden');
-                document.getElementById('navOwnerBtn').classList.remove('hidden');
+        window.addEventListener("DOMContentLoaded", () => {
+            const savedUserData = localStorage.getItem("activeEspUser");
+            if (savedUserData) {
+                activeAccount = JSON.parse(savedUserData);
+                openDashboard();
             }
+        });
+
+        function showOwnerPanel() {
+            loginSection.style.display = "none";
+            ownerSection.style.display = "flex";
         }
 
-        async function handleClientLogin() {
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
-            const errorEl = document.getElementById('loginError');
+        function showLoginSection() {
+            ownerSection.style.display = "none";
+            loginSection.style.display = "flex";
+        }
 
-            errorEl.classList.add('hidden');
+        // LOGIN
+        document.getElementById("loginForm").addEventListener("submit", async function(e) {
+            e.preventDefault();
+            const email = document.getElementById("loginEmail").value.trim().toLowerCase();
+            const password = document.getElementById("loginPassword").value;
+            const errorMsg = document.getElementById("loginErrorMsg");
 
             try {
                 const res = await fetch(`${API_URL}/login`, {
@@ -158,217 +161,337 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password })
                 });
-
                 const data = await res.json();
+
                 if (data.success) {
-                    localStorage.setItem('user', JSON.stringify(data.user));
-                    renderClientDashboard(data.user);
-                    showView('clientDashboardView');
+                    activeAccount = data.user;
+                    localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
+                    errorMsg.style.display = "none";
+                    openDashboard();
                 } else {
-                    errorEl.textContent = data.message || "Invalid credentials";
-                    errorEl.classList.remove('hidden');
+                    errorMsg.innerText = data.message;
+                    errorMsg.style.display = "block";
                 }
             } catch (err) {
-                errorEl.textContent = "Cannot connect to backend server!";
-                errorEl.classList.remove('hidden');
+                errorMsg.innerText = "Cannot connect to server!";
+                errorMsg.style.display = "block";
             }
-        }
+        });
 
-        function renderClientDashboard(user) {
-            document.getElementById('clientWelcomeTitle').textContent = user.title ? `${user.title} Devices` : "My Devices";
-            const deviceList = document.getElementById('deviceList');
-            const noDevicesMsg = document.getElementById('noDevicesMsg');
-            deviceList.innerHTML = '';
-
-            if (!user.buttons || user.buttons.length === 0) {
-                noDevicesMsg.classList.remove('hidden');
-                return;
-            }
-
-            noDevicesMsg.classList.add('hidden');
-            user.buttons.forEach(btn => {
-                const card = document.createElement('div');
-                card.className = 'device-card';
-                card.innerHTML = `
-                    <h3>${btn.name}</h3>
-                    <p class="mac-label">MAC: ${btn.mac}</p>
-                    <button class="toggle-btn ${btn.state ? 'btn-on' : 'btn-off'}" onclick="toggleDevice('${btn.id}')">
-                        ${btn.state ? 'ON' : 'OFF'}
-                    </button>
-                    <button class="btn-danger-sm" style="margin-top:10px;" onclick="removeDevice('${btn.id}')">Remove</button>
-                `;
-                deviceList.appendChild(card);
-            });
-        }
-
-        async function handleOwnerLogin() {
-            const adminKey = document.getElementById('adminKeyInput').value;
-            const errorEl = document.getElementById('adminKeyError');
-            errorEl.classList.add('hidden');
+        // ADMIN FUNCTIONS
+        async function verifyAdminKey() {
+            const keyInput = document.getElementById("adminKeyInput").value;
+            const authError = document.getElementById("adminAuthError");
 
             try {
                 const res = await fetch(`${API_URL}/admin/users`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminKey })
+                    body: JSON.stringify({ adminKey: keyInput })
                 });
-
                 const data = await res.json();
+
                 if (data.success) {
-                    activeAdminKey = adminKey;
-                    renderAdminTable(data.users);
-                    populateUserSelect(data.users);
-                    showView('ownerDashboardView');
+                    currentAdminKey = keyInput;
+                    authError.style.display = "none";
+                    document.getElementById("adminAuthBox").style.display = "none";
+                    document.getElementById("adminControls").style.display = "block";
+                    renderUserList(data.users);
                 } else {
-                    errorEl.textContent = data.message || "Invalid owner key!";
-                    errorEl.classList.remove('hidden');
+                    authError.innerText = data.message;
+                    authError.style.display = "block";
                 }
             } catch (err) {
-                errorEl.textContent = "Cannot connect to backend server!";
-                errorEl.classList.remove('hidden');
+                authError.innerText = "Cannot connect to backend server!";
+                authError.style.display = "block";
             }
         }
 
-        function renderAdminTable(users) {
-            const tbody = document.getElementById('registeredUsersTable');
-            tbody.innerHTML = '';
+        function renderUserList(users) {
+            const container = document.getElementById("userListContainer");
+            if (users.length === 0) {
+                container.innerHTML = "<p style='color: #888;'>No clients added yet.</p>";
+                return;
+            }
+
+            let html = "<table class='admin-table'><tr><th>Email</th><th>Device Name</th><th>Action</th></tr>";
             users.forEach(u => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${u.email}</td>
+                html += `<tr>
+                    <td><strong>${u.email}</strong></td>
                     <td>${u.title}</td>
-                    <td>${u.buttonCount}</td>
-                    <td><button class="btn-danger-sm" onclick="deleteUser('${u.email}')">Delete</button></td>
-                `;
-                tbody.appendChild(tr);
+                    <td><button class='deleteBtn' onclick="deleteUser('${u.email}')">Delete User</button></td>
+                </tr>`;
             });
-        }
-
-        function populateUserSelect(users) {
-            const select = document.getElementById('userSelect');
-            select.innerHTML = '<option value="">Select Client Account</option>';
-            users.forEach(u => {
-                const opt = document.createElement('option');
-                opt.value = u.email;
-                opt.textContent = `${u.email} (${u.title})`;
-                select.appendChild(opt);
-            });
-        }
-
-        async function handleCreateAccount(e) {
-            e.preventDefault();
-            const email = document.getElementById('newEmail').value;
-            const password = document.getElementById('newPassword').value;
-            const title = document.getElementById('newTitle').value;
-
-            const res = await fetch(`${API_URL}/admin/add-user`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ adminKey: activeAdminKey, email, password, title })
-            });
-
-            const data = await res.json();
-            if (data.success) {
-                alert("Account created!");
-                handleOwnerLogin();
-            } else {
-                alert(data.message);
-            }
-        }
-
-        async function handlePairDevice(e) {
-            e.preventDefault();
-            const targetEmail = document.getElementById('userSelect').value;
-            const buttonName = document.getElementById('devName').value;
-            const pubTopic = document.getElementById('pubTopic').value;
-            const subTopic = document.getElementById('subTopic').value;
-            const macAddr = document.getElementById('macAddr').value;
-
-            const res = await fetch(`${API_URL}/admin/add-button`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ targetEmail, buttonName, pubTopic, subTopic, macAddr })
-            });
-
-            const data = await res.json();
-            if (data.success) {
-                alert("Device paired!");
-                handleOwnerLogin();
-            } else {
-                alert(data.message);
-            }
+            html += "</table>";
+            container.innerHTML = html;
         }
 
         async function deleteUser(email) {
-            if (!confirm(`Delete account ${email}?`)) return;
-            await fetch(`${API_URL}/admin/delete-user`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ adminKey: activeAdminKey, targetEmail: email })
-            });
-            handleOwnerLogin();
+            if (!confirm(`Are you sure you want to delete user: ${email}?`)) return;
+            try {
+                const res = await fetch(`${API_URL}/admin/delete-user`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminKey: currentAdminKey, targetEmail: email })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    verifyAdminKey();
+                } else {
+                    alert(data.message);
+                }
+            } catch (err) {
+                alert("Failed to delete user.");
+            }
         }
 
-        function signOut() {
-            localStorage.removeItem('user');
-            showView('clientSignInView');
-        }
+        // QR SCANNER PAIRING
+        async function registerNewButton(targetEmail, buttonName, pubTopic, subTopic, macAddr = "") {
+            try {
+                const res = await fetch(`${API_URL}/admin/add-button`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminKey: currentAdminKey, targetEmail, buttonName, pubTopic, subTopic, macAddr })
+                });
+                const data = await res.json();
 
-        // --- QR SCANNER IMPLEMENTATION ---
-        function startQrScanner() {
-            document.getElementById('qrScannerSection').classList.remove('hidden');
-            html5QrCode = new Html5Qrcode("qr-reader");
-
-            html5QrCode.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 200, height: 200 } },
-                (decodedText) => {
-                    try {
-                        const qrData = JSON.parse(decodedText);
-                        stopQrScanner();
-                        pairDeviceFromQr(qrData);
-                    } catch (e) {
-                        alert("Invalid QR format! Ensure QR code contains valid device JSON.");
+                if (data.success) {
+                    if (client && client.isConnected()) {
+                        const configPayload = JSON.stringify({
+                            name: buttonName,
+                            pubTopic: pubTopic,
+                            subTopic: subTopic,
+                            mac: macAddr
+                        });
+                        let configMsg = new Paho.Message(configPayload);
+                        configMsg.destinationName = "esp32/setup/config";
+                        client.send(configMsg);
                     }
-                },
-                () => {}
-            ).catch(() => alert("Could not open camera. Please check browser permissions."));
+                    return true;
+                } else {
+                    alert(data.message);
+                    return false;
+                }
+            } catch (err) {
+                alert("Server error!");
+                return false;
+            }
+        }
+
+        function toggleQrScanner() {
+            const qrDiv = document.getElementById("qrReader");
+            if (qrDiv.style.display === "none") {
+                qrDiv.style.display = "block";
+                html5QrCodeScanner = new Html5Qrcode("qrReader");
+                html5QrCodeScanner.start(
+                    { facingMode: "environment" },
+                    { fps: 10, qrbox: 250 },
+                    onQrCodeScanned
+                ).catch(err => alert("Camera access error: " + err));
+            } else {
+                stopQrScanner();
+            }
         }
 
         function stopQrScanner() {
-            if (html5QrCode) {
-                html5QrCode.stop().then(() => {
-                    html5QrCode.clear();
-                    document.getElementById('qrScannerSection').classList.add('hidden');
-                }).catch(() => document.getElementById('qrScannerSection').classList.add('hidden'));
-            } else {
-                document.getElementById('qrScannerSection').classList.add('hidden');
+            if (html5QrCodeScanner) {
+                html5QrCodeScanner.stop().then(() => {
+                    document.getElementById("qrReader").style.display = "none";
+                });
             }
         }
 
-        async function pairDeviceFromQr(qrData) {
-            const currentUser = JSON.parse(localStorage.getItem('user'));
-            if (!currentUser) return;
-
-            const response = await fetch(`${API_URL}/client/add-button-qr`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email: currentUser.email,
-                    buttonName: qrData.name || "ESP32 Device",
-                    pubTopic: qrData.pub || "",
-                    subTopic: qrData.sub || "",
-                    macAddr: qrData.mac || "FF:FF:FF:FF:FF:FF"
-                })
-            });
-
-            const result = await response.json();
-            if (result.success) {
-                alert("Device paired successfully!");
-                location.reload();
-            } else {
-                alert(result.message || "Failed to pair device.");
+        async function onQrCodeScanned(decodedText) {
+            stopQrScanner();
+            try {
+                const qrData = JSON.parse(decodedText);
+                if (qrData.pubTopic && qrData.subTopic) {
+                    const success = await registerNewButton(
+                        activeAccount.email,
+                        qrData.name || "New Device",
+                        qrData.pubTopic,
+                        qrData.subTopic,
+                        qrData.mac || ""
+                    );
+                    if (success) {
+                        alert("Device paired and added successfully!");
+                        window.location.reload();
+                    }
+                } else {
+                    alert("Invalid device QR code payload format.");
+                }
+            } catch (e) {
+                alert("Scanned QR code is not valid JSON device data.");
             }
+        }
+
+        // CLIENT DASHBOARD & MQTT SETUP
+        function openDashboard() {
+            loginSection.style.display = "none";
+            ownerSection.style.display = "none";
+            controlSection.style.display = "flex";
+            logoutBtn.style.display = "block";
+            document.getElementById("deviceHeader").innerText = activeAccount.title;
+
+            renderClientButtons();
+            initMqttConnection();
+        }
+
+        function renderClientButtons() {
+            const container = document.getElementById("clientButtonsContainer");
+            container.innerHTML = "";
+
+            if (!activeAccount.buttons || activeAccount.buttons.length === 0) {
+                container.innerHTML = "<p style='color:#888;'>No control buttons assigned. Click the + button to pair a device.</p>";
+                return;
+            }
+
+            activeAccount.buttons.forEach((b, index) => {
+                buttonStates[b.id] = false;
+                container.innerHTML += `
+                    <div class="device-card">
+                        <h3>${b.name}</h3>
+                        <button id="btn_${b.id}" class="authBtn appliance-btn" 
+                                onmousedown="startHold('${b.id}')" 
+                                onmouseup="endHold('${b.id}', '${b.pubTopic}')" 
+                                onmouseleave="cancelHold()"
+                                ontouchstart="startHold('${b.id}')" 
+                                ontouchend="endHold('${b.id}', '${b.pubTopic}')"
+                                ontouchcancel="cancelHold()">Connecting...</button>
+                        <button id="delBtn_${b.id}" class="delete-device-btn" style="display: none;" 
+                                onclick="deleteDevice('${b.id}', ${index})">✕ Delete Device</button>
+                    </div>
+                `;
+            });
+        }
+
+        // HOLD GESTURE LOGIC
+        function startHold(buttonId) {
+            isHoldTriggered = false;
+            holdTimer = setTimeout(() => {
+                isHoldTriggered = true;
+                const delBtn = document.getElementById(`delBtn_${buttonId}`);
+                if (delBtn) {
+                    delBtn.style.display = (delBtn.style.display === "none") ? "block" : "none";
+                }
+            }, 1000); // 1.0 second hold duration
+        }
+
+        function endHold(buttonId, pubTopic) {
+            clearTimeout(holdTimer);
+            if (!isHoldTriggered) {
+                toggleAppliance(buttonId, pubTopic);
+            }
+        }
+
+        function cancelHold() {
+            clearTimeout(holdTimer);
+        }
+
+        // DELETE DEVICE FROM WEB & ESP32
+        async function deleteDevice(buttonId, index) {
+            if (!confirm("Are you sure you want to remove this device from web and ESP32?")) return;
+
+            try {
+                // 1. Send MQTT Delete Topic to clear device on ESP32
+                if (client && client.isConnected()) {
+                    const deletePayload = JSON.stringify({ action: "delete", index: index });
+                    let delMsg = new Paho.Message(deletePayload);
+                    delMsg.destinationName = "esp32/setup/delete";
+                    client.send(delMsg);
+                }
+
+                // 2. Backend Delete API call
+                const res = await fetch(`${API_URL}/client/delete-button`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: activeAccount.email, buttonId: buttonId })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    activeAccount.buttons = activeAccount.buttons.filter(b => b.id !== buttonId);
+                    localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
+                    renderClientButtons();
+                } else {
+                    alert("Failed to delete device from server.");
+                }
+            } catch (err) {
+                alert("Error deleting device.");
+            }
+        }
+
+        function initMqttConnection() {
+            const uniqueClientId = "web_client_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
+            client = new Paho.Client(broker, Number(port), "/mqtt", uniqueClientId);
+            
+            client.onMessageArrived = (msg) => {
+                if (activeAccount.buttons) {
+                    const matchedBtn = activeAccount.buttons.find(b => b.subTopic === msg.destinationName);
+                    if (matchedBtn) {
+                        const state = (msg.payloadString === "1");
+                        buttonStates[matchedBtn.id] = state;
+                        const btnEl = document.getElementById(`btn_${matchedBtn.id}`);
+                        if (btnEl) {
+                            btnEl.innerText = state ? "ON" : "OFF";
+                        }
+                    }
+                }
+            };
+
+            client.onConnectionLost = () => { 
+                if (activeAccount.buttons) {
+                    activeAccount.buttons.forEach(b => {
+                        const btnEl = document.getElementById(`btn_${b.id}`);
+                        if (btnEl) btnEl.innerText = "Reconnecting...";
+                    });
+                }
+            };
+
+            client.connect({
+                useSSL: true,
+                cleanSession: true,
+                timeout: 10,
+                onSuccess: () => {
+                    if (activeAccount.buttons) {
+                        activeAccount.buttons.forEach(b => {
+                            if (b.subTopic) client.subscribe(b.subTopic);
+                            const btnEl = document.getElementById(`btn_${b.id}`);
+                            if (btnEl) {
+                                btnEl.innerText = "OFF";
+                            }
+                        });
+                    }
+                }
+            });
+        }
+
+        function toggleAppliance(buttonId, pubTopic) {
+            if (!client || !client.isConnected()) return;
+
+            let currentState = buttonStates[buttonId] || false;
+            let nextState = currentState ? "0" : "1";
+            
+            let message = new Paho.Message(nextState);
+            message.destinationName = pubTopic;
+            client.send(message);
+
+            buttonStates[buttonId] = (nextState === "1");
+            const btnEl = document.getElementById(`btn_${buttonId}`);
+            if (btnEl) {
+                btnEl.innerText = buttonStates[buttonId] ? "ON" : "OFF";
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem("activeEspUser");
+            if (client && client.isConnected()) client.disconnect();
+            activeAccount = null;
+            
+            controlSection.style.display = "none";
+            logoutBtn.style.display = "none";
+            loginSection.style.display = "flex";
+            document.getElementById("loginForm").reset();
         }
     </script>
 </body>
