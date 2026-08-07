@@ -1,4 +1,3 @@
-//node server.js
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -10,10 +9,14 @@ const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'users.json');
 
 // Configuration
-const OWNER_SECRET_KEY = "admin123"; // Change this to your desired secret key
+const OWNER_SECRET_KEY = "admin123";
 
-// Middleware
-app.use(cors());
+// Middleware setup with full CORS support
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(bodyParser.json());
 app.use(express.static(__dirname));
 
@@ -60,7 +63,6 @@ app.post('/api/login', (req, res) => {
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase().trim() && u.password === password);
 
     if (user) {
-        // Exclude sensitive internal data if necessary
         return res.json({
             success: true,
             user: {
@@ -218,12 +220,11 @@ app.post('/api/client/delete-button', (req, res) => {
 });
 
 // -------------------------------------------------------------
-// START SERVER
+// START SERVER (Listening on 0.0.0.0 required for Render)
 // -------------------------------------------------------------
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`=================================`);
     console.log(`ESP32 Controller Server Running  `);
     console.log(`Port: ${PORT}                    `);
-    console.log(`URL: http://localhost:${PORT}     `);
     console.log(`=================================`);
 });
