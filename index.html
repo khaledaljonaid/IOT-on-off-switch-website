@@ -10,7 +10,6 @@
     <script src="https://unpkg.com/html5-qrcode"></script>
     <link rel="stylesheet" href="style.css">
     <style>
-        /* Additional inline styles for long-press delete button */
         .device-card {
             margin: 15px auto;
             max-width: 300px;
@@ -84,7 +83,7 @@
                         <input type="text" id="newTitle" placeholder="Device Name (e.g. Living Room ESP)" required><br>
                         <button type="submit" class="authBtn">Add Client</button>
                     </form>
-                    <p id="adminAddMsg" class="success-text" style="display: none;"></p>
+                    <p id="adminAddMsg" style="display: none; margin-top: 10px;"></p>
                 </div>
             </div>
 
@@ -97,7 +96,6 @@
 
     <!-- 3. CLIENT CONTROL SECTION -->
     <div id="controlSection" style="display: none;">
-        <!-- Top Right Plus Scan Button -->
         <button class="scan-plus-btn" onclick="toggleQrScanner()" title="Pair Device">+</button>
 
         <h1 id="deviceHeader">Appliance Control</h1>
@@ -111,7 +109,6 @@
         const broker = "broker.hivemq.com";
         const port = 8884;
         
-        // Dynamic API URL for Localhost and Render
         const API_URL = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") 
             ? `http://${window.location.hostname}:3000/api` 
             : `${window.location.origin}/api`;
@@ -122,7 +119,6 @@
         let currentAdminKey = "";
         let html5QrCodeScanner = null;
         
-        // Hold Timer Variables
         let holdTimer = null;
         let isHoldTriggered = false;
 
@@ -208,9 +204,43 @@
             }
         }
 
+        // ADD NEW CLIENT HANDLER
+        document.getElementById("adminAddForm").addEventListener("submit", async function(e) {
+            e.preventDefault();
+            const email = document.getElementById("newEmail").value.trim();
+            const password = document.getElementById("newPassword").value;
+            const title = document.getElementById("newTitle").value.trim();
+            const msgEl = document.getElementById("adminAddMsg");
+
+            try {
+                const res = await fetch(`${API_URL}/admin/add-user`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminKey: currentAdminKey, email, password, title })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    msgEl.innerText = data.message;
+                    msgEl.style.color = "#22c55e";
+                    msgEl.style.display = "block";
+                    document.getElementById("adminAddForm").reset();
+                    verifyAdminKey();
+                } else {
+                    msgEl.innerText = data.message;
+                    msgEl.style.color = "#ef4444";
+                    msgEl.style.display = "block";
+                }
+            } catch (err) {
+                msgEl.innerText = "Error adding client!";
+                msgEl.style.color = "#ef4444";
+                msgEl.style.display = "block";
+            }
+        });
+
         function renderUserList(users) {
             const container = document.getElementById("userListContainer");
-            if (users.length === 0) {
+            if (!users || users.length === 0) {
                 container.innerHTML = "<p style='color: #888;'>No clients added yet.</p>";
                 return;
             }
@@ -366,7 +396,6 @@
             });
         }
 
-        // HOLD GESTURE LOGIC
         function startHold(buttonId) {
             isHoldTriggered = false;
             holdTimer = setTimeout(() => {
@@ -389,7 +418,6 @@
             clearTimeout(holdTimer);
         }
 
-        // DELETE DEVICE FROM WEB & ESP32
         async function deleteDevice(buttonId, index) {
             if (!confirm("Are you sure you want to remove this device from web and ESP32?")) return;
 
