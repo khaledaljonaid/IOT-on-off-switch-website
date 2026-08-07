@@ -6,6 +6,8 @@ const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Explicit path to users.json in the same root folder as server.js
 const DATA_FILE = path.join(__dirname, 'users.json');
 
 // Configuration
@@ -18,6 +20,8 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(bodyParser.json());
+
+// Serve static frontend files (index.html, style.css, etc.) from current directory
 app.use(express.static(__dirname));
 
 // -------------------------------------------------------------
@@ -26,15 +30,21 @@ app.use(express.static(__dirname));
 function loadUsers() {
     try {
         if (!fs.existsSync(DATA_FILE)) {
+            // Create a clean users.json file in the root folder if missing
             try {
-                fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2));
+                fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2), 'utf8');
             } catch (wErr) {
                 console.warn("Could not write initial users.json:", wErr.message);
             }
             return [];
         }
-        const data = fs.readFileSync(DATA_FILE, 'utf8');
-        return data.trim() ? JSON.parse(data) : [];
+
+        const data = fs.readFileSync(DATA_FILE, 'utf8').trim();
+        if (!data) return [];
+
+        const parsed = JSON.parse(data);
+        // Ensure the returned data is always an array
+        return Array.isArray(parsed) ? parsed : [];
     } catch (err) {
         console.error("Error reading/parsing users.json:", err.message);
         return [];
@@ -43,7 +53,8 @@ function loadUsers() {
 
 function saveUsers(users) {
     try {
-        fs.writeFileSync(DATA_FILE, JSON.stringify(users, null, 2));
+        const safeData = Array.isArray(users) ? users : [];
+        fs.writeFileSync(DATA_FILE, JSON.stringify(safeData, null, 2), 'utf8');
         return true;
     } catch (err) {
         console.error("Error writing users.json:", err.message);
@@ -65,7 +76,7 @@ app.post('/api/login', (req, res) => {
         }
 
         const users = loadUsers();
-        const user = users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase().trim() && u.password === password);
+        const user = users.find(u => u && u.email && u.email.toLowerCase() === email.toLowerCase().trim() && u.password === password);
 
         if (user) {
             return res.json({
@@ -94,11 +105,17 @@ app.post('/api/admin/users', (req, res) => {
             return res.status(403).json({ success: false, message: "Invalid owner secret key!" });
         }
 
-        const users = loadUsers();
+        let users = loadUsers();
+
+        // Extra safety check to prevent .map() errors
+        if (!Array.isArray(users)) {
+            users = [];
+        }
+
         const sanitizedUsers = users.map(u => ({
-            email: u.email || "",
-            title: u.title || "Unnamed Device",
-            buttonCount: u.buttons ? u.buttons.length : 0
+            email: u && u.email ? u.email : "",
+            title: u && u.title ? u.title : "Unnamed Device",
+            buttonCount: u && Array.isArray(u.buttons) ? u.buttons.length : 0
         }));
 
         return res.json({ success: true, users: sanitizedUsers });
@@ -121,10 +138,10 @@ app.post('/api/admin/add-user', (req, res) => {
             return res.status(400).json({ success: false, message: "All fields are required." });
         }
 
-        const users = loadUsers();
+        let users = loadUsers();
         const normalizedEmail = email.toLowerCase().trim();
 
-        if (users.some(u => u.email && u.email.toLowerCase() === normalizedEmail)) {
+        if (users.some(u => u && u.email && u.email.toLowerCase() === normalizedEmail)) {
             return res.status(400).json({ success: false, message: "Client email already exists." });
         }
 
@@ -159,7 +176,7 @@ app.post('/api/admin/delete-user', (req, res) => {
 
         let users = loadUsers();
         const initialCount = users.length;
-        users = users.filter(u => u.email && u.email.toLowerCase() !== targetEmail.toLowerCase().trim());
+        users = users.filter(u => u && u.email && u.email.toLowerCase() !== targetEmail.toLowerCase().trim());
 
         if (users.length === initialCount) {
             return res.status(404).json({ success: false, message: "Target user not found." });
@@ -186,13 +203,13 @@ app.post('/api/admin/add-button', (req, res) => {
         }
 
         let users = loadUsers();
-        const userIndex = users.findIndex(u => u.email && u.email.toLowerCase() === targetEmail.toLowerCase().trim());
+        const userIndex = users.findIndex(u => u && u.email && u.email.toLowerCase() === targetEmail.toLowerCase().trim());
 
         if (userIndex === -1) {
             return res.status(404).json({ success: false, message: "Client account not found." });
         }
 
-        if (!users[userIndex].buttons) {
+        if (!Array.isArray(users[userIndex].buttons)) {
             users[userIndex].buttons = [];
         }
 
@@ -227,13 +244,13 @@ app.post('/api/client/delete-button', (req, res) => {
         }
 
         let users = loadUsers();
-        const userIndex = users.findIndex(u => u.email && u.email.toLowerCase() === email.toLowerCase().trim());
+        const userIndex = users.findIndex(u => u && u.email && u.email.toLowerCase() === email.toLowerCase().trim());
 
         if (userIndex === -1) {
             return res.status(404).json({ success: false, message: "Client account not found." });
         }
 
-        if (users[userIndex].buttons) {
+        if (Array.isArray(users[userIndex].buttons)) {
             const initialLength = users[userIndex].buttons.length;
             users[userIndex].buttons = users[userIndex].buttons.filter(b => b.id !== buttonId);
 
