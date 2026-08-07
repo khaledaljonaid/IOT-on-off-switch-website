@@ -21,18 +21,22 @@ app.use(bodyParser.json());
 app.use(express.static(__dirname));
 
 // -------------------------------------------------------------
-// HELPER FUNCTIONS FOR FILE I/O
+// SAFE HELPER FUNCTIONS FOR FILE I/O
 // -------------------------------------------------------------
 function loadUsers() {
-    if (!fs.existsSync(DATA_FILE)) {
-        fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2));
-        return [];
-    }
     try {
+        if (!fs.existsSync(DATA_FILE)) {
+            try {
+                fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2));
+            } catch (wErr) {
+                console.warn("Could not write initial users.json:", wErr.message);
+            }
+            return [];
+        }
         const data = fs.readFileSync(DATA_FILE, 'utf8');
-        return JSON.parse(data || '[]');
+        return data.trim() ? JSON.parse(data) : [];
     } catch (err) {
-        console.error("Error reading users.json:", err);
+        console.error("Error reading/parsing users.json:", err.message);
         return [];
     }
 }
@@ -42,7 +46,7 @@ function saveUsers(users) {
         fs.writeFileSync(DATA_FILE, JSON.stringify(users, null, 2));
         return true;
     } catch (err) {
-        console.error("Error writing users.json:", err);
+        console.error("Error writing users.json:", err.message);
         return false;
     }
 }
@@ -53,169 +57,199 @@ function saveUsers(users) {
 
 // 1. CLIENT LOGIN
 app.post('/api/login', (req, res) => {
-    const { email, password } = req.body;
+    try {
+        const { email, password } = req.body || {};
 
-    if (!email || !password) {
-        return res.status(400).json({ success: false, message: "Email and password are required." });
-    }
+        if (!email || !password) {
+            return res.status(400).json({ success: false, message: "Email and password are required." });
+        }
 
-    const users = loadUsers();
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase().trim() && u.password === password);
+        const users = loadUsers();
+        const user = users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase().trim() && u.password === password);
 
-    if (user) {
-        return res.json({
-            success: true,
-            user: {
-                email: user.email,
-                title: user.title,
-                buttons: user.buttons || []
-            }
-        });
-    } else {
-        return res.status(401).json({ success: false, message: "Invalid email or password." });
+        if (user) {
+            return res.json({
+                success: true,
+                user: {
+                    email: user.email,
+                    title: user.title,
+                    buttons: user.buttons || []
+                }
+            });
+        } else {
+            return res.status(401).json({ success: false, message: "Invalid email or password." });
+        }
+    } catch (err) {
+        console.error("Error in /api/login:", err);
+        return res.status(500).json({ success: false, message: "Server error during login." });
     }
 });
 
 // 2. ADMIN: AUTHENTICATE & FETCH USER LIST
 app.post('/api/admin/users', (req, res) => {
-    const { adminKey } = req.body;
+    try {
+        const { adminKey } = req.body || {};
 
-    if (adminKey !== OWNER_SECRET_KEY) {
-        return res.status(403).json({ success: false, message: "Invalid owner secret key!" });
+        if (adminKey !== OWNER_SECRET_KEY) {
+            return res.status(403).json({ success: false, message: "Invalid owner secret key!" });
+        }
+
+        const users = loadUsers();
+        const sanitizedUsers = users.map(u => ({
+            email: u.email || "",
+            title: u.title || "Unnamed Device",
+            buttonCount: u.buttons ? u.buttons.length : 0
+        }));
+
+        return res.json({ success: true, users: sanitizedUsers });
+    } catch (err) {
+        console.error("Critical error in /api/admin/users:", err);
+        return res.status(500).json({ success: false, message: "Server error processing request: " + err.message });
     }
-
-    const users = loadUsers();
-    const sanitizedUsers = users.map(u => ({
-        email: u.email,
-        title: u.title,
-        buttonCount: u.buttons ? u.buttons.length : 0
-    }));
-
-    return res.json({ success: true, users: sanitizedUsers });
 });
 
 // 3. ADMIN: ADD NEW CLIENT ACCOUNT
 app.post('/api/admin/add-user', (req, res) => {
-    const { adminKey, email, password, title } = req.body;
+    try {
+        const { adminKey, email, password, title } = req.body || {};
 
-    if (adminKey !== OWNER_SECRET_KEY) {
-        return res.status(403).json({ success: false, message: "Unauthorized access." });
-    }
+        if (adminKey !== OWNER_SECRET_KEY) {
+            return res.status(403).json({ success: false, message: "Unauthorized access." });
+        }
 
-    if (!email || !password || !title) {
-        return res.status(400).json({ success: false, message: "All fields are required." });
-    }
+        if (!email || !password || !title) {
+            return res.status(400).json({ success: false, message: "All fields are required." });
+        }
 
-    const users = loadUsers();
-    const normalizedEmail = email.toLowerCase().trim();
+        const users = loadUsers();
+        const normalizedEmail = email.toLowerCase().trim();
 
-    if (users.some(u => u.email.toLowerCase() === normalizedEmail)) {
-        return res.status(400).json({ success: false, message: "Client email already exists." });
-    }
+        if (users.some(u => u.email && u.email.toLowerCase() === normalizedEmail)) {
+            return res.status(400).json({ success: false, message: "Client email already exists." });
+        }
 
-    const newUser = {
-        email: normalizedEmail,
-        password: password,
-        title: title,
-        buttons: []
-    };
+        const newUser = {
+            email: normalizedEmail,
+            password: password,
+            title: title,
+            buttons: []
+        };
 
-    users.push(newUser);
+        users.push(newUser);
 
-    if (saveUsers(users)) {
-        return res.json({ success: true, message: "Client account created successfully." });
-    } else {
-        return res.status(500).json({ success: false, message: "Failed to save client data." });
+        if (saveUsers(users)) {
+            return res.json({ success: true, message: "Client account created successfully." });
+        } else {
+            return res.status(500).json({ success: false, message: "Failed to save client data to storage." });
+        }
+    } catch (err) {
+        console.error("Error in /api/admin/add-user:", err);
+        return res.status(500).json({ success: false, message: "Server error adding user." });
     }
 });
 
 // 4. ADMIN: DELETE CLIENT ACCOUNT
 app.post('/api/admin/delete-user', (req, res) => {
-    const { adminKey, targetEmail } = req.body;
+    try {
+        const { adminKey, targetEmail } = req.body || {};
 
-    if (adminKey !== OWNER_SECRET_KEY) {
-        return res.status(403).json({ success: false, message: "Unauthorized access." });
-    }
+        if (adminKey !== OWNER_SECRET_KEY) {
+            return res.status(403).json({ success: false, message: "Unauthorized access." });
+        }
 
-    let users = loadUsers();
-    const initialCount = users.length;
-    users = users.filter(u => u.email.toLowerCase() !== targetEmail.toLowerCase().trim());
+        let users = loadUsers();
+        const initialCount = users.length;
+        users = users.filter(u => u.email && u.email.toLowerCase() !== targetEmail.toLowerCase().trim());
 
-    if (users.length === initialCount) {
-        return res.status(404).json({ success: false, message: "Target user not found." });
-    }
+        if (users.length === initialCount) {
+            return res.status(404).json({ success: false, message: "Target user not found." });
+        }
 
-    if (saveUsers(users)) {
-        return res.json({ success: true, message: "Client account deleted successfully." });
-    } else {
-        return res.status(500).json({ success: false, message: "Failed to update storage." });
+        if (saveUsers(users)) {
+            return res.json({ success: true, message: "Client account deleted successfully." });
+        } else {
+            return res.status(500).json({ success: false, message: "Failed to update storage." });
+        }
+    } catch (err) {
+        console.error("Error in /api/admin/delete-user:", err);
+        return res.status(500).json({ success: false, message: "Server error deleting user." });
     }
 });
 
 // 5. REGISTER / ADD DEVICE BUTTON TO CLIENT (via QR Code or Form)
 app.post('/api/admin/add-button', (req, res) => {
-    const { targetEmail, buttonName, pubTopic, subTopic, macAddr } = req.body;
+    try {
+        const { targetEmail, buttonName, pubTopic, subTopic, macAddr } = req.body || {};
 
-    if (!targetEmail || !pubTopic || !subTopic) {
-        return res.status(400).json({ success: false, message: "Missing required device fields." });
-    }
+        if (!targetEmail || !pubTopic || !subTopic) {
+            return res.status(400).json({ success: false, message: "Missing required device fields." });
+        }
 
-    let users = loadUsers();
-    const userIndex = users.findIndex(u => u.email.toLowerCase() === targetEmail.toLowerCase().trim());
+        let users = loadUsers();
+        const userIndex = users.findIndex(u => u.email && u.email.toLowerCase() === targetEmail.toLowerCase().trim());
 
-    if (userIndex === -1) {
-        return res.status(404).json({ success: false, message: "Client account not found." });
-    }
+        if (userIndex === -1) {
+            return res.status(404).json({ success: false, message: "Client account not found." });
+        }
 
-    if (!users[userIndex].buttons) {
-        users[userIndex].buttons = [];
-    }
+        if (!users[userIndex].buttons) {
+            users[userIndex].buttons = [];
+        }
 
-    const newButton = {
-        id: "btn_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
-        name: buttonName || "New Appliance",
-        pubTopic: pubTopic,
-        subTopic: subTopic,
-        mac: macAddr || "FF:FF:FF:FF:FF:FF"
-    };
+        const newButton = {
+            id: "btn_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+            name: buttonName || "New Appliance",
+            pubTopic: pubTopic,
+            subTopic: subTopic,
+            mac: macAddr || "FF:FF:FF:FF:FF:FF"
+        };
 
-    users[userIndex].buttons.push(newButton);
+        users[userIndex].buttons.push(newButton);
 
-    if (saveUsers(users)) {
-        return res.json({ success: true, message: "Device button paired successfully.", button: newButton });
-    } else {
-        return res.status(500).json({ success: false, message: "Failed to save device pairing." });
+        if (saveUsers(users)) {
+            return res.json({ success: true, message: "Device button paired successfully.", button: newButton });
+        } else {
+            return res.status(500).json({ success: false, message: "Failed to save device pairing." });
+        }
+    } catch (err) {
+        console.error("Error in /api/admin/add-button:", err);
+        return res.status(500).json({ success: false, message: "Server error adding button." });
     }
 });
 
 // 6. CLIENT: DELETE DEVICE BUTTON
 app.post('/api/client/delete-button', (req, res) => {
-    const { email, buttonId } = req.body;
+    try {
+        const { email, buttonId } = req.body || {};
 
-    if (!email || !buttonId) {
-        return res.status(400).json({ success: false, message: "Email and Button ID are required." });
-    }
-
-    let users = loadUsers();
-    const userIndex = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase().trim());
-
-    if (userIndex === -1) {
-        return res.status(404).json({ success: false, message: "Client account not found." });
-    }
-
-    if (users[userIndex].buttons) {
-        const initialLength = users[userIndex].buttons.length;
-        users[userIndex].buttons = users[userIndex].buttons.filter(b => b.id !== buttonId);
-
-        if (users[userIndex].buttons.length === initialLength) {
-            return res.status(404).json({ success: false, message: "Device button not found." });
+        if (!email || !buttonId) {
+            return res.status(400).json({ success: false, message: "Email and Button ID are required." });
         }
-    }
 
-    if (saveUsers(users)) {
-        return res.json({ success: true, message: "Device deleted successfully." });
-    } else {
-        return res.status(500).json({ success: false, message: "Failed to delete device from server storage." });
+        let users = loadUsers();
+        const userIndex = users.findIndex(u => u.email && u.email.toLowerCase() === email.toLowerCase().trim());
+
+        if (userIndex === -1) {
+            return res.status(404).json({ success: false, message: "Client account not found." });
+        }
+
+        if (users[userIndex].buttons) {
+            const initialLength = users[userIndex].buttons.length;
+            users[userIndex].buttons = users[userIndex].buttons.filter(b => b.id !== buttonId);
+
+            if (users[userIndex].buttons.length === initialLength) {
+                return res.status(404).json({ success: false, message: "Device button not found." });
+            }
+        }
+
+        if (saveUsers(users)) {
+            return res.json({ success: true, message: "Device deleted successfully." });
+        } else {
+            return res.status(500).json({ success: false, message: "Failed to delete device from server storage." });
+        }
+    } catch (err) {
+        console.error("Error in /api/client/delete-button:", err);
+        return res.status(500).json({ success: false, message: "Server error deleting button." });
     }
 });
 
