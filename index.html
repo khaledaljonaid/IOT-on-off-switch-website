@@ -282,12 +282,26 @@
                 const res = await fetch(`${API_URL}/admin/add-button`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminKey: currentAdminKey, targetEmail, buttonName, pubTopic, subTopic, macAddr })
+                    body: JSON.stringify({ targetEmail, buttonName, pubTopic, subTopic, macAddr })
                 });
                 const data = await res.json();
 
                 if (data.success) {
+                    // Update Local Storage and Active Session
+                    if (!activeAccount.buttons) activeAccount.buttons = [];
+                    
+                    const existingIdx = activeAccount.buttons.findIndex(b => b.id === data.button.id);
+                    if (existingIdx !== -1) {
+                        activeAccount.buttons[existingIdx] = data.button;
+                    } else {
+                        activeAccount.buttons.push(data.button);
+                    }
+                    localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
+
+                    // Subscribe to new subTopic and send Setup Config over MQTT
                     if (client && client.isConnected()) {
+                        if (data.button.subTopic) client.subscribe(data.button.subTopic);
+
                         const configPayload = JSON.stringify({
                             name: buttonName,
                             pubTopic: pubTopic,
@@ -298,13 +312,15 @@
                         configMsg.destinationName = "esp32/setup/config";
                         client.send(configMsg);
                     }
+
+                    renderClientButtons();
                     return true;
                 } else {
                     alert(data.message);
                     return false;
                 }
             } catch (err) {
-                alert("Server error!");
+                alert("Server error connecting to backend.");
                 return false;
             }
         }
@@ -336,20 +352,24 @@
             stopQrScanner();
             try {
                 const qrData = JSON.parse(decodedText);
+                
+                // Flexible field mapping for device name and mac address
+                const deviceName = qrData.deviceName || qrData.name || qrData.title || qrData.device || "Appliance";
+                const macAddress = qrData.mac || qrData.macAddr || "FF:FF:FF:FF:FF:FF";
+
                 if (qrData.pubTopic && qrData.subTopic) {
                     const success = await registerNewButton(
                         activeAccount.email,
-                        qrData.name || "New Device",
+                        deviceName,
                         qrData.pubTopic,
                         qrData.subTopic,
-                        qrData.mac || ""
+                        macAddress
                     );
                     if (success) {
-                        alert("Device paired and added successfully!");
-                        window.location.reload();
+                        alert(`Device "${deviceName}" paired successfully!`);
                     }
                 } else {
-                    alert("Invalid device QR code payload format.");
+                    alert("Invalid QR code! Missing required MQTT topics.");
                 }
             } catch (e) {
                 alert("Scanned QR code is not valid JSON device data.");
@@ -378,7 +398,10 @@
             }
 
             activeAccount.buttons.forEach((b, index) => {
-                buttonStates[b.id] = false;
+                if (!(b.id in buttonStates)) {
+                    buttonStates[b.id] = false;
+                }
+                
                 container.innerHTML += `
                     <div class="device-card">
                         <h3>${b.name}</h3>
@@ -388,7 +411,7 @@
                                 onmouseleave="cancelHold()"
                                 ontouchstart="startHold('${b.id}')" 
                                 ontouchend="endHold('${b.id}', '${b.pubTopic}')"
-                                ontouchcancel="cancelHold()">Connecting...</button>
+                                ontouchcancel="cancelHold()">${buttonStates[b.id] ? "ON" : "OFF"}</button>
                         <button id="delBtn_${b.id}" class="delete-device-btn" style="display: none;" 
                                 onclick="deleteDevice('${b.id}', ${index})">✕ Delete Device</button>
                     </div>
@@ -423,7 +446,7 @@
 
             try {
                 if (client && client.isConnected()) {
-                    const deletePayload = JSON.stringify({ action: "delete", index: index });
+                    const deletePayload = JSON.stringify({ index: index });
                     let delMsg = new Paho.Message(deletePayload);
                     delMsg.destinationName = "esp32/setup/delete";
                     client.send(delMsg);
@@ -485,7 +508,7 @@
                             if (b.subTopic) client.subscribe(b.subTopic);
                             const btnEl = document.getElementById(`btn_${b.id}`);
                             if (btnEl) {
-                                btnEl.innerText = "OFF";
+                                btnEl.innerText = buttonStates[b.id] ? "ON" : "OFF";
                             }
                         });
                     }
