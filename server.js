@@ -191,10 +191,10 @@ app.post('/api/admin/delete-user', (req, res) => {
     }
 });
 
-// 5. REGISTER / PAIR DEVICE BUTTON TO CLIENT (Via QR Code scanning)
+// 5. REGISTER / PAIR DEVICE BUTTON TO CLIENT (AUTOMATIC UNIQUE INTERNAL ID)
 app.post('/api/admin/add-button', (req, res) => {
     try {
-        const { targetEmail, buttonName, pubTopic, subTopic, macAddr } = req.body || {};
+        const { targetEmail, buttonName, pubTopic, subTopic, macAddr, customId } = req.body || {};
 
         if (!targetEmail || !pubTopic || !subTopic) {
             return res.status(400).json({ success: false, message: "Missing required device fields." });
@@ -211,7 +211,7 @@ app.post('/api/admin/add-button', (req, res) => {
             users[userIndex].buttons = [];
         }
 
-        // Prevent duplicate buttons by checking pubTopic/subTopic
+        // Check if device with matching topics already exists
         const existingBtnIndex = users[userIndex].buttons.findIndex(
             b => b.pubTopic === pubTopic && b.subTopic === subTopic
         );
@@ -219,14 +219,17 @@ app.post('/api/admin/add-button', (req, res) => {
         let targetButton;
 
         if (existingBtnIndex !== -1) {
-            // Update existing button
+            // Update existing device entry
             users[userIndex].buttons[existingBtnIndex].name = buttonName || users[userIndex].buttons[existingBtnIndex].name;
             users[userIndex].buttons[existingBtnIndex].mac = macAddr || users[userIndex].buttons[existingBtnIndex].mac;
             targetButton = users[userIndex].buttons[existingBtnIndex];
         } else {
-            // Create new button entry
+            // AUTOMATIC UNIQUE INTERNAL ID GENERATION
+            // Uses provided customId from payload, or falls back to timestamp + random string
+            const generatedId = customId || ("btn_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7));
+
             targetButton = {
-                id: "btn_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+                id: generatedId,
                 name: buttonName || "New Appliance",
                 pubTopic: pubTopic,
                 subTopic: subTopic,
