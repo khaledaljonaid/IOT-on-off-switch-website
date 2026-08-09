@@ -7,13 +7,13 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Explicit path to users.json in the same root folder as server.js
+// Explicit path to users.json in the root directory
 const DATA_FILE = path.join(__dirname, 'users.json');
 
 // Configuration
 const OWNER_SECRET_KEY = "admin123";
 
-// Middleware setup with full CORS support
+// Middleware setup
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -21,16 +21,15 @@ app.use(cors({
 }));
 app.use(bodyParser.json());
 
-// Serve static frontend files (index.html, style.css, etc.) from current directory
+// Serve static frontend files (index.html, style.css, etc.)
 app.use(express.static(__dirname));
 
 // -------------------------------------------------------------
-// SAFE HELPER FUNCTIONS FOR FILE I/O
+// HELPER FUNCTIONS FOR FILE I/O
 // -------------------------------------------------------------
 function loadUsers() {
     try {
         if (!fs.existsSync(DATA_FILE)) {
-            // Create a clean users.json file in the root folder if missing
             try {
                 fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2), 'utf8');
             } catch (wErr) {
@@ -43,7 +42,6 @@ function loadUsers() {
         if (!data) return [];
 
         const parsed = JSON.parse(data);
-        // Ensure the returned data is always an array
         return Array.isArray(parsed) ? parsed : [];
     } catch (err) {
         console.error("Error reading/parsing users.json:", err.message);
@@ -106,11 +104,7 @@ app.post('/api/admin/users', (req, res) => {
         }
 
         let users = loadUsers();
-
-        // Extra safety check to prevent .map() errors
-        if (!Array.isArray(users)) {
-            users = [];
-        }
+        if (!Array.isArray(users)) users = [];
 
         const sanitizedUsers = users.map(u => ({
             email: u && u.email ? u.email : "",
@@ -174,6 +168,10 @@ app.post('/api/admin/delete-user', (req, res) => {
             return res.status(403).json({ success: false, message: "Unauthorized access." });
         }
 
+        if (!targetEmail) {
+            return res.status(400).json({ success: false, message: "Target email is required." });
+        }
+
         let users = loadUsers();
         const initialCount = users.length;
         users = users.filter(u => u && u.email && u.email.toLowerCase() !== targetEmail.toLowerCase().trim());
@@ -193,7 +191,7 @@ app.post('/api/admin/delete-user', (req, res) => {
     }
 });
 
-// 5. REGISTER / ADD DEVICE BUTTON TO CLIENT (via QR Code or Form)
+// 5. REGISTER / PAIR DEVICE BUTTON TO CLIENT (Via QR Code scanning)
 app.post('/api/admin/add-button', (req, res) => {
     try {
         const { targetEmail, buttonName, pubTopic, subTopic, macAddr } = req.body || {};
@@ -213,18 +211,32 @@ app.post('/api/admin/add-button', (req, res) => {
             users[userIndex].buttons = [];
         }
 
-        const newButton = {
-            id: "btn_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
-            name: buttonName || "New Appliance",
-            pubTopic: pubTopic,
-            subTopic: subTopic,
-            mac: macAddr || "FF:FF:FF:FF:FF:FF"
-        };
+        // Prevent duplicate buttons by checking pubTopic/subTopic
+        const existingBtnIndex = users[userIndex].buttons.findIndex(
+            b => b.pubTopic === pubTopic && b.subTopic === subTopic
+        );
 
-        users[userIndex].buttons.push(newButton);
+        let targetButton;
+
+        if (existingBtnIndex !== -1) {
+            // Update existing button
+            users[userIndex].buttons[existingBtnIndex].name = buttonName || users[userIndex].buttons[existingBtnIndex].name;
+            users[userIndex].buttons[existingBtnIndex].mac = macAddr || users[userIndex].buttons[existingBtnIndex].mac;
+            targetButton = users[userIndex].buttons[existingBtnIndex];
+        } else {
+            // Create new button entry
+            targetButton = {
+                id: "btn_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+                name: buttonName || "New Appliance",
+                pubTopic: pubTopic,
+                subTopic: subTopic,
+                mac: macAddr || "FF:FF:FF:FF:FF:FF"
+            };
+            users[userIndex].buttons.push(targetButton);
+        }
 
         if (saveUsers(users)) {
-            return res.json({ success: true, message: "Device button paired successfully.", button: newButton });
+            return res.json({ success: true, message: "Device button paired successfully.", button: targetButton });
         } else {
             return res.status(500).json({ success: false, message: "Failed to save device pairing." });
         }
@@ -271,7 +283,7 @@ app.post('/api/client/delete-button', (req, res) => {
 });
 
 // -------------------------------------------------------------
-// START SERVER (Listening on 0.0.0.0 required for Render)
+// START SERVER
 // -------------------------------------------------------------
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`=================================`);
