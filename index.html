@@ -679,11 +679,15 @@
             clearTimeout(holdTimer);
         }
 
-        async function deleteDevice(buttonId, index) {
-            if (!confirm("Are you sure you want to remove this device from web and ESP32?")) return;
+        async function deleteDevice(buttonId, index, isFromESP32 = false) {
+            // Only ask for confirmation if the user clicked delete on the website
+            if (!isFromESP32) {
+                if (!confirm("Are you sure you want to remove this device from web and ESP32?")) return;
+            }
 
             try {
-                if (client && client.isConnected()) {
+                // Only send MQTT message if deleting FROM the website UI
+                if (!isFromESP32 && client && client.isConnected()) {
                     const deletePayload = JSON.stringify({ index: index });
                     let delMsg = new Paho.Message(deletePayload);
                     delMsg.destinationName = "esp32/setup/delete";
@@ -701,19 +705,40 @@
                     activeAccount.buttons = activeAccount.buttons.filter(b => b.id !== buttonId);
                     localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
                     renderClientButtons();
+                    
+                    // Alert the user if the ESP32 deleted it
+                    if (isFromESP32) {
+                        alert("Device deleted via ESP32 hardware button.");
+                    }
                 } else {
-                    alert("Failed to delete device from server.");
+                    if (!isFromESP32) alert("Failed to delete device from server.");
                 }
             } catch (err) {
-                alert("Error deleting device.");
+                if (!isFromESP32) alert("Error deleting device.");
             }
         }
-
         function initMqttConnection() {
             const uniqueClientId = "web_client_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
             client = new Paho.Client(broker, Number(port), "/mqtt", uniqueClientId);
             
             client.onMessageArrived = (msg) => {
+                // Check if the message is a delete command from the ESP32
+                if (msg.destinationName === "esp32/setup/delete") {
+                    try {
+                        const payload = JSON.parse(msg.payloadString);
+                        // If it came from the ESP32 and has a valid index
+                        if (payload.source === "esp32" && payload.index >= 0) {
+                            if (activeAccount.buttons && activeAccount.buttons[payload.index]) {
+                                const buttonId = activeAccount.buttons[payload.index].id;
+                                // Delete silently without user confirmation
+                                deleteDevice(buttonId, payload.index, true); 
+                            }
+                        }
+                    } catch(e) {}
+                    return; 
+                }
+
+                // Normal on/off button toggling
                 if (activeAccount.buttons) {
                     const matchedBtn = activeAccount.buttons.find(b => b.subTopic === msg.destinationName);
                     if (matchedBtn) {
@@ -726,7 +751,7 @@
                     }
                 }
             };
-
+            
             client.onConnectionLost = () => { 
                 if (activeAccount.buttons) {
                     activeAccount.buttons.forEach(b => {
@@ -741,6 +766,9 @@
                 cleanSession: true,
                 timeout: 10,
                 onSuccess: () => {
+                    // Tell the website to listen for delete commands!
+                    client.subscribe("esp32/setup/delete");
+
                     if (activeAccount.buttons) {
                         activeAccount.buttons.forEach(b => {
                             if (b.subTopic) client.subscribe(b.subTopic);
@@ -752,7 +780,6 @@
                     }
                 }
             });
-        }
 
         function toggleAppliance(buttonId, pubTopic) {
             if (!client || !client.isConnected()) return;
