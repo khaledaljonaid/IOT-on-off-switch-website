@@ -1,252 +1,80 @@
-* {
-            box-sizing: border-box;
-        }
-
+* { box-sizing: border-box; }
         body { 
-            margin: 0;  
-            background-color: black;
-            color: white;
-            font-family: sans-serif; 
-            text-align: center;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
+            margin: 0; background-color: black; color: white;
+            font-family: sans-serif; text-align: center;
+            min-height: 100vh; display: flex; flex-direction: column;
+            transition: all 0.3s ease;
         }
 
         header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 18px;
-            width: 100%;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 18px; width: 100%;
         }
-
-        .logo img {
-            width: 140px;
-            height: auto;
-        }
+        .logo img { width: 140px; height: auto; }
+        
+        .header-buttons { display: flex; gap: 10px; align-items: center; }
 
         /* Sections */
-        #loginSection {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start;
-            align-items: center;
-            padding: 20px;
-            padding-top: 40px;
-            width: 100%;
+        #loginSection, #ownerSection, #controlSection {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; padding: 20px; width: 100%;
+        }
+        #loginSection { justify-content: flex-start; padding-top: 40px; }
+        #ownerSection, #controlSection { justify-content: center; position: relative; }
+
+        .form-container { width: 100%; max-width: 320px; }
+        h1 { font-size: 1.8rem; margin-bottom: 20px; }
+        h2 { font-size: 1.3rem; }
+
+        input {
+            width: 100%; max-width: 300px; padding: 12px; margin: 8px 0;
+            border-radius: 6px; border: 1px solid #333; background-color: #111;
+            color: white; outline: none; font-size: 1rem;
         }
 
-        #ownerSection, #controlSection {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-            width: 100%;
-            position: relative;
-        }
-
-        .form-container {
-            width: 100%;
-            max-width: 320px;
-        }
-
-        h1 {
-            font-size: 1.8rem;
-            margin-bottom: 20px;
-        }
-
-        h2 {
-            font-size: 1.3rem;
-        }
-
-        /* Form Controls */
-        #loginSection input, #ownerSection input {
-            width: 100%;
-            max-width: 300px;
-            padding: 12px;
-            margin: 8px 0;
-            border-radius: 6px;
-            border: 1px solid #333;
-            background-color: #111;
-            color: white;
-            outline: none;
-            font-size: 1rem;
-        }
-
-        /* Generic Auth Button */
         .authBtn {
-            width: 100%;
-            max-width: 300px;
-            padding: 12px;
-            margin-top: 10px;
-            background-color: rgb(0, 162, 255);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 1rem;
+            width: 100%; max-width: 300px; padding: 12px; margin-top: 10px;
+            background-color: rgb(0, 162, 255); color: white; border: none;
+            border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1rem;
         }
+        .authBtn:hover { opacity: 0.9; }
 
-        /* On/Off Appliance Buttons Always rgb(0, 162, 255) */
         .appliance-btn {
             background-color: rgb(0, 162, 255) !important;
-            user-select: none; /* Prevents text selection on hold */
-            -webkit-user-select: none;
+            user-select: none; -webkit-user-select: none;
         }
 
-        /* Smaller Sign Out Button */
-        #logoutBtn {
-            width: auto;
-            padding: 6px 12px;
-            font-size: 0.8rem;
-            background-color: #222;
-            color: #ccc;
-            border: 1px solid #444;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: normal;
+        .small-btn {
+            padding: 6px 12px; font-size: 0.8rem; background-color: #222;
+            color: #ccc; border: 1px solid #444; border-radius: 4px; cursor: pointer;
         }
+        .small-btn:hover { background-color: #333; color: white; }
 
-        #logoutBtn:hover {
-            background-color: #333;
-            color: white;
-        }
-
-        /* Plus Sign Scan Button at Top Right */
         .scan-plus-btn {
-            position: absolute;
-            top: 15px;
-            right: 20px;
-            width: 42px;
-            height: 42px;
-            background-color: rgb(0, 162, 255);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            font-size: 1.8rem;
-            font-weight: bold;
-            line-height: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            box-shadow: 0px 2px 8px rgba(0, 162, 255, 0.4);
-            transition: transform 0.1s ease;
+            position: absolute; top: 15px; inset-inline-end: 20px; /* Adapts to RTL/LTR */
+            width: 42px; height: 42px; background-color: rgb(0, 162, 255); color: white;
+            border: none; border-radius: 50%; font-size: 1.8rem; font-weight: bold;
+            line-height: 1; display: flex; justify-content: center; align-items: center;
+            cursor: pointer; box-shadow: 0px 2px 8px rgba(0, 162, 255, 0.4);
         }
+        .scan-plus-btn:active { transform: scale(0.92); }
 
-        .scan-plus-btn:active {
-            transform: scale(0.92);
-        }
+        .error-text { color: #ef4444; font-size: 0.9rem; margin-top: 10px; }
+        .toggle-text { margin-top: 25px; font-size: 0.9rem; color: #888; }
+        .toggle-text span { color: rgb(0, 162, 255); cursor: pointer; text-decoration: underline; }
 
-        .authBtn:hover {
-            opacity: 0.9;
-        }
+        .forms-wrapper { display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin: 20px auto; max-width: 400px; }
+        .form-card { flex: 1; min-width: 280px; width: 100%; }
 
-        .error-text {
-            color: #ef4444;
-            font-size: 0.9rem;
-            margin-top: 10px;
-        }
+        .admin-table { margin: 20px auto; border-collapse: collapse; width: 100%; max-width: 500px; background-color: #111; }
+        .admin-table th, .admin-table td { border: 1px solid #333; padding: 10px; font-size: 0.85rem; }
+        .admin-table th { background-color: #222; color: rgb(0, 162, 255); }
 
-        .success-text {
-            color: #22c55e;
-            font-size: 0.9rem;
-            margin-top: 10px;
-        }
+        .deleteBtn, .delete-device-btn { background-color: #ef4444; color: white; border: none; cursor: pointer; border-radius: 4px; }
+        .deleteBtn { padding: 6px 12px; }
+        .delete-device-btn { padding: 5px 10px; font-size: 0.75rem; margin-top: 8px; animation: fadeIn 0.2s ease-in-out; }
+        .deleteBtn:hover, .delete-device-btn:hover { background-color: #dc2626; }
 
-        .toggle-text {
-            margin-top: 25px;
-            font-size: 0.9rem;
-            color: #888;
-        }
+        .device-card { margin: 15px auto; max-width: 300px; display: flex; flex-direction: column; align-items: center; }
 
-        .toggle-text span {
-            color: rgb(0, 162, 255);
-            cursor: pointer;
-            text-decoration: underline;
-        }
-
-        .forms-wrapper {
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            gap: 30px;
-            flex-wrap: wrap;
-            margin: 20px auto;
-            width: 100%;
-            max-width: 400px;
-        }
-
-        .form-card {
-            flex: 1;
-            min-width: 280px;
-            max-width: 380px;
-            width: 100%;
-        }
-
-        /* Admin Table */
-        .admin-table {
-            margin: 20px auto;
-            border-collapse: collapse;
-            width: 100%;
-            max-width: 500px;
-            background-color: #111;
-        }
-
-        .admin-table th, .admin-table td {
-            border: 1px solid #333;
-            padding: 10px;
-            font-size: 0.85rem;
-        }
-
-        .admin-table th {
-            background-color: #222;
-            color: rgb(0, 162, 255);
-        }
-
-        .deleteBtn {
-            background-color: #ef4444;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        .deleteBtn:hover {
-            background-color: #dc2626;
-        }
-
-        .device-card {
-            margin: 15px auto;
-            max-width: 300px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .delete-device-btn {
-            background-color: #ef4444;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            font-size: 0.75rem;
-            border-radius: 4px;
-            margin-top: 8px;
-            cursor: pointer;
-            animation: fadeIn 0.2s ease-in-out;
-        }
-
-        .delete-device-btn:hover {
-            background-color: #dc2626;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-4px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
