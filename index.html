@@ -10,13 +10,11 @@
 </head>
 <body>
 
-    <!-- Added dir="ltr" here to prevent layout flipping when language changes -->
     <header dir="ltr">
         <div class="logo">
             <img src="Screenshot_2026-07-18_220821-removebg-preview.png" alt="logo">
         </div>
         <div class="header-buttons">
-            <!-- dir="auto" ensures the text inside still renders correctly for Arabic -->
             <button class="small-btn" id="langToggleBtn" onclick="toggleLanguage()" dir="auto">🌐 عربي</button>
             <button class="small-btn" id="logoutBtn" onclick="logout()" style="display: none;" data-i18n="signOut" dir="auto">Sign Out</button>
         </div>
@@ -72,7 +70,6 @@
     </div>
 
     <script>
-        // --- TRANSLATION DICTIONARY ---
         const translations = {
             en: {
                 langToggle: "🌐 عربي",
@@ -311,7 +308,24 @@
                 if (!(b.id in buttonStates)) buttonStates[b.id] = false;
                 const stateText = buttonStates[b.id] ? translations[currentLang].stateOn : translations[currentLang].stateOff;
                 
-                const displayName = currentLang === 'ar' ? (b.nameAr || b.name) : (b.nameEn || b.name);
+                // Parse packed database string for names
+                let nameEn = b.nameEn;
+                let nameAr = b.nameAr;
+                let rawName = b.name || "Device";
+
+                if (!nameEn || !nameAr) {
+                    if (rawName.includes('|')) {
+                        const parts = rawName.split('|');
+                        nameEn = parts[0];
+                        nameAr = parts[1] || parts[0];
+                    } else {
+                        // Fallback if it's an old DB entry that doesn't have a |
+                        nameEn = rawName;
+                        nameAr = rawName; 
+                    }
+                }
+
+                const displayName = currentLang === 'ar' ? nameAr : nameEn;
 
                 container.innerHTML += `
                     <div class="device-card">
@@ -445,13 +459,19 @@
                 const qrData = JSON.parse(decodedText);
                 if (qrData.pubTopic && qrData.subTopic) {
                     
+                    const nEn = qrData.nameEn || "Room Light";
+                    const nAr = qrData.nameAr || "إضاءة الغرفة";
+                    
+                    // Pack both names into one string using | as a separator for backend storage
+                    const combinedName = nEn + "|" + nAr; 
+
                     const res = await fetch(`${API_URL}/admin/add-button`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
                             targetEmail: activeAccount.email, 
-                            nameEn: qrData.nameEn || "Device", 
-                            nameAr: qrData.nameAr || "جهاز",
-                            buttonName: qrData.nameEn || "Device",
+                            nameEn: nEn, 
+                            nameAr: nAr,
+                            buttonName: combinedName,
                             pubTopic: qrData.pubTopic, 
                             subTopic: qrData.subTopic, 
                             macAddr: qrData.mac || "FF:FF:FF:FF:FF:FF" 
@@ -463,8 +483,9 @@
                         if (!activeAccount.buttons) activeAccount.buttons = [];
                         
                         const newBtn = data.button;
-                        newBtn.nameEn = qrData.nameEn;
-                        newBtn.nameAr = qrData.nameAr;
+                        // Ensure local rendering uses the correct names right away
+                        newBtn.nameEn = nEn;
+                        newBtn.nameAr = nAr;
 
                         activeAccount.buttons.push(newBtn);
                         localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
@@ -473,8 +494,8 @@
                             client.subscribe(newBtn.subTopic);
                             
                             let configMsg = new Paho.Message(JSON.stringify({
-                                nameEn: qrData.nameEn, 
-                                nameAr: qrData.nameAr, 
+                                nameEn: nEn, 
+                                nameAr: nAr, 
                                 pubTopic: qrData.pubTopic, 
                                 subTopic: qrData.subTopic, 
                                 mac: qrData.mac
