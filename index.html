@@ -152,7 +152,7 @@
             });
 
             if (document.getElementById("controlSection").style.display !== "none") renderClientButtons();
-            if (document.getElementById("adminControls").style.display !== "none") verifyAdminKey(); // re-render table
+            if (document.getElementById("adminControls").style.display !== "none") verifyAdminKey(); 
         }
 
         function toggleLanguage() {
@@ -181,7 +181,7 @@
         const logoutBtn = document.getElementById("logoutBtn");
 
         window.addEventListener("DOMContentLoaded", () => {
-            applyLanguage(); // Apply chosen language immediately
+            applyLanguage(); 
             const savedUserData = localStorage.getItem("activeEspUser");
             if (savedUserData) {
                 activeAccount = JSON.parse(savedUserData);
@@ -311,9 +311,13 @@
                 if (!(b.id in buttonStates)) buttonStates[b.id] = false;
                 const stateText = buttonStates[b.id] ? translations[currentLang].stateOn : translations[currentLang].stateOff;
                 
+                // Determine which name to show based on language. 
+                // Falls back to b.name if older buttons don't have nameEn/nameAr yet.
+                const displayName = currentLang === 'ar' ? (b.nameAr || b.name) : (b.nameEn || b.name);
+
                 container.innerHTML += `
                     <div class="device-card">
-                        <h3>${b.name}</h3>
+                        <h3>${displayName}</h3>
                         <button id="btn_${b.id}" class="authBtn appliance-btn" 
                                 oncontextmenu="return false;"
                                 onmousedown="startHold('${b.id}', event)" onmouseup="endHold('${b.id}', '${b.pubTopic}', event)" 
@@ -437,32 +441,59 @@
         function stopQrScanner() {
             if (html5QrCodeScanner) html5QrCodeScanner.stop().then(() => { document.getElementById("qrReader").style.display = "none"; });
         }
+        
         async function onQrCodeScanned(decodedText) {
             stopQrScanner();
             try {
                 const qrData = JSON.parse(decodedText);
                 if (qrData.pubTopic && qrData.subTopic) {
+                    
+                    // Modified to send BOTH names to your backend API
                     const res = await fetch(`${API_URL}/admin/add-button`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
-                            targetEmail: activeAccount.email, buttonName: qrData.name || "Device", 
-                            pubTopic: qrData.pubTopic, subTopic: qrData.subTopic, macAddr: qrData.mac || "FF:FF:FF:FF:FF:FF" 
+                            targetEmail: activeAccount.email, 
+                            nameEn: qrData.nameEn || "Device", 
+                            nameAr: qrData.nameAr || "جهاز",
+                            buttonName: qrData.nameEn || "Device", // Kept for backwards compatibility with your backend
+                            pubTopic: qrData.pubTopic, 
+                            subTopic: qrData.subTopic, 
+                            macAddr: qrData.mac || "FF:FF:FF:FF:FF:FF" 
                         })
                     });
+                    
                     const data = await res.json();
                     if (data.success) {
                         if (!activeAccount.buttons) activeAccount.buttons = [];
-                        activeAccount.buttons.push(data.button);
+                        
+                        // Ensure local storage also saves both names 
+                        const newBtn = data.button;
+                        newBtn.nameEn = qrData.nameEn;
+                        newBtn.nameAr = qrData.nameAr;
+
+                        activeAccount.buttons.push(newBtn);
                         localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
+                        
                         if (client && client.isConnected()) {
-                            client.subscribe(data.button.subTopic);
-                            let configMsg = new Paho.Message(JSON.stringify({name: qrData.name, pubTopic: qrData.pubTopic, subTopic: qrData.subTopic, mac: qrData.mac}));
-                            configMsg.destinationName = "esp32/setup/config"; client.send(configMsg);
+                            client.subscribe(newBtn.subTopic);
+                            
+                            // Send the updated full JSON payload via MQTT to the ESP32
+                            let configMsg = new Paho.Message(JSON.stringify({
+                                nameEn: qrData.nameEn, 
+                                nameAr: qrData.nameAr, 
+                                pubTopic: qrData.pubTopic, 
+                                subTopic: qrData.subTopic, 
+                                mac: qrData.mac
+                            }));
+                            configMsg.destinationName = "esp32/setup/config"; 
+                            client.send(configMsg);
                         }
                         renderClientButtons();
                     }
                 }
-            } catch (e) {}
+            } catch (e) {
+                console.error("Failed to parse QR or send data:", e);
+            }
         }
     </script>
 </body>
