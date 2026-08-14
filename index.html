@@ -10,13 +10,15 @@
 </head>
 <body>
 
-    <header>
+    <!-- Added dir="ltr" here to prevent layout flipping when language changes -->
+    <header dir="ltr">
         <div class="logo">
             <img src="Screenshot_2026-07-18_220821-removebg-preview.png" alt="logo">
         </div>
         <div class="header-buttons">
-            <button class="small-btn" id="langToggleBtn" onclick="toggleLanguage()">🌐 عربي</button>
-            <button class="small-btn" id="logoutBtn" onclick="logout()" style="display: none;" data-i18n="signOut">Sign Out</button>
+            <!-- dir="auto" ensures the text inside still renders correctly for Arabic -->
+            <button class="small-btn" id="langToggleBtn" onclick="toggleLanguage()" dir="auto">🌐 عربي</button>
+            <button class="small-btn" id="logoutBtn" onclick="logout()" style="display: none;" data-i18n="signOut" dir="auto">Sign Out</button>
         </div>
     </header>
 
@@ -217,7 +219,6 @@
             }
         });
 
-        // ADMIN
         async function verifyAdminKey() {
             const keyInput = document.getElementById("adminKeyInput").value || currentAdminKey;
             if(!keyInput) return;
@@ -291,7 +292,6 @@
             } catch (err) {}
         }
 
-        // CLIENT DASHBOARD
         function openDashboard() {
             loginSection.style.display = "none"; ownerSection.style.display = "none";
             controlSection.style.display = "flex"; logoutBtn.style.display = "block";
@@ -311,8 +311,6 @@
                 if (!(b.id in buttonStates)) buttonStates[b.id] = false;
                 const stateText = buttonStates[b.id] ? translations[currentLang].stateOn : translations[currentLang].stateOff;
                 
-                // Determine which name to show based on language. 
-                // Falls back to b.name if older buttons don't have nameEn/nameAr yet.
                 const displayName = currentLang === 'ar' ? (b.nameAr || b.name) : (b.nameEn || b.name);
 
                 container.innerHTML += `
@@ -429,7 +427,6 @@
             loginSection.style.display = "flex"; document.getElementById("loginForm").reset();
         }
 
-        // QR SCANNER
         function toggleQrScanner() {
             const qrDiv = document.getElementById("qrReader");
             if (qrDiv.style.display === "none") {
@@ -448,14 +445,13 @@
                 const qrData = JSON.parse(decodedText);
                 if (qrData.pubTopic && qrData.subTopic) {
                     
-                    // Modified to send BOTH names to your backend API
                     const res = await fetch(`${API_URL}/admin/add-button`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
                             targetEmail: activeAccount.email, 
                             nameEn: qrData.nameEn || "Device", 
                             nameAr: qrData.nameAr || "جهاز",
-                            buttonName: qrData.nameEn || "Device", // Kept for backwards compatibility with your backend
+                            buttonName: qrData.nameEn || "Device",
                             pubTopic: qrData.pubTopic, 
                             subTopic: qrData.subTopic, 
                             macAddr: qrData.mac || "FF:FF:FF:FF:FF:FF" 
@@ -466,7 +462,6 @@
                     if (data.success) {
                         if (!activeAccount.buttons) activeAccount.buttons = [];
                         
-                        // Ensure local storage also saves both names 
                         const newBtn = data.button;
                         newBtn.nameEn = qrData.nameEn;
                         newBtn.nameAr = qrData.nameAr;
@@ -477,7 +472,6 @@
                         if (client && client.isConnected()) {
                             client.subscribe(newBtn.subTopic);
                             
-                            // Send the updated full JSON payload via MQTT to the ESP32
                             let configMsg = new Paho.Message(JSON.stringify({
                                 nameEn: qrData.nameEn, 
                                 nameAr: qrData.nameAr, 
