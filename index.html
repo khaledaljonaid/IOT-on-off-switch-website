@@ -3,152 +3,466 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Home Control</title>
-    <!-- Paho MQTT Client Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <title>ESP32 Control</title>
+    <script src="https://cdn.jsdelivr.net/npm/paho-mqtt@1.1.0/paho-mqtt.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <header>
-        <div class="logo">🏠 Smart Home</div>
+        <div class="logo">
+            <img src="Screenshot_2026-07-18_220821-removebg-preview.png" alt="logo">
+        </div>
         <div class="header-buttons">
-            <button class="small-btn" onclick="toggleLanguage()" id="langBtn">عربي</button>
+            <button class="small-btn" id="langToggleBtn" onclick="toggleLanguage()">🌐 عربي</button>
+            <button class="small-btn" id="logoutBtn" onclick="logout()" style="display: none;" data-i18n="signOut">Sign Out</button>
         </div>
     </header>
 
-    <section id="controlSection">
-        <button class="scan-plus-btn" onclick="showAddDeviceForm()">+</button>
-        
-        <h1 id="titleText">My Devices</h1>
-        
-        <!-- Dummy display to show connection status -->
-        <p id="mqttStatus" style="color: #888; font-size: 0.8rem;">Connecting to MQTT...</p>
+    <div id="loginSection">
+        <div class="form-container">
+            <h1 data-i18n="signInTitle">Sign In</h1>
+            <form id="loginForm">
+                <input type="email" id="loginEmail" data-i18n-ph="emailPh" placeholder="Email" required><br>
+                <input type="password" id="loginPassword" data-i18n-ph="passPh" placeholder="Password" required><br>
+                <button type="submit" class="authBtn" data-i18n="loginBtn">Login</button>
+            </form>
+            <p id="loginErrorMsg" class="error-text" style="display: none;" data-i18n="invalidCreds">Invalid credentials!</p>
+            <p class="toggle-text"><span onclick="showOwnerPanel()" data-i18n="ownerPortal">Owner Portal</span></p>
+        </div>
+    </div>
 
-        <!-- Device Card displaying correct language -->
-        <div id="deviceList" class="device-card hidden">
-            <h2 id="displayDeviceName"></h2>
+    <div id="ownerSection" style="display: none;">
+        <h1 data-i18n="ownerDash">Owner Dashboard</h1>
+        
+        <div id="adminAuthBox">
+            <input type="password" id="adminKeyInput" data-i18n-ph="secretKeyPh" placeholder="Enter Owner Secret Key"><br>
+            <button class="authBtn" onclick="verifyAdminKey()" data-i18n="accessAdminBtn">Access Admin Panel</button>
+            <p id="adminAuthError" class="error-text" style="display: none;"></p>
         </div>
 
-        <!-- Add Device Form (Simulating QR Code Data) -->
-        <div class="form-container hidden" id="addDeviceForm">
-            <h2 id="formTitleText">Add New Device</h2>
-            <input type="text" id="devNameEn" placeholder="Device Name (English)" value="Lamp">
-            <input type="text" id="devNameAr" placeholder="Device Name (Arabic)" value="مصباح">
-            <input type="text" id="devPub" placeholder="Publish Topic" value="room/lamp/set">
-            <input type="text" id="devSub" placeholder="Subscribe Topic" value="room/lamp/state">
-            <input type="text" id="devMac" placeholder="MAC Address" value="AA:BB:CC:DD:EE:FF">
-            <button class="authBtn" onclick="sendDeviceData()" id="submitBtnText">Add via MQTT</button>
+        <div id="adminControls" style="display: none;">
+            <div class="forms-wrapper">
+                <div class="form-card">
+                    <h2 data-i18n="addClientTitle">Add New Client Account</h2>
+                    <form id="adminAddForm">
+                        <input type="email" id="newEmail" data-i18n-ph="clientEmailPh" placeholder="Client Email" required><br>
+                        <input type="password" id="newPassword" data-i18n-ph="clientPassPh" placeholder="Client Password" required><br>
+                        <input type="text" id="newTitle" data-i18n-ph="devNamePh" placeholder="Device Name" required><br>
+                        <button type="submit" class="authBtn" data-i18n="addClientBtn">Add Client</button>
+                    </form>
+                    <p id="adminAddMsg" style="display: none; margin-top: 10px;"></p>
+                </div>
+            </div>
+            <h2 style="margin-top: 40px;" data-i18n="existingClients">Existing Clients</h2>
+            <div id="userListContainer"></div>
         </div>
-    </section>
+
+        <p class="toggle-text"><span onclick="showLoginSection()" data-i18n="backToLogin">← Back to Sign In</span></p>
+    </div>
+
+    <div id="controlSection" style="display: none;">
+        <button class="scan-plus-btn" onclick="toggleQrScanner()" title="Pair Device">+</button>
+        <h1 id="deviceHeader">Appliance Control</h1>
+        <div id="qrReader" style="width: 100%; max-width: 320px; display: none; margin: 15px auto;"></div>
+        <div id="clientButtonsContainer"></div>
+    </div>
 
     <script>
-        let currentLang = 'en';
-        let latestDeviceData = null;
-
-        // MQTT Client Setup
-        const mqttServer = "broker.hivemq.com";
-        const mqttPort = 8000; // WebSocket port for HiveMQ
-        const setupTopic = "esp32/setup/config";
-        
-        const clientId = "WebClient-" + Math.random().toString(16).substr(2, 8);
-        const client = new Paho.MQTT.Client(mqttServer, mqttPort, clientId);
-
-        client.onConnectionLost = function(responseObject) {
-            document.getElementById("mqttStatus").innerText = (currentLang === 'en') ? "Disconnected" : "غير متصل";
-            document.getElementById("mqttStatus").style.color = "#ef4444";
+        // --- TRANSLATION DICTIONARY ---
+        const translations = {
+            en: {
+                langToggle: "🌐 عربي",
+                signInTitle: "Sign In",
+                emailPh: "Email",
+                passPh: "Password",
+                loginBtn: "Login",
+                invalidCreds: "Invalid credentials!",
+                ownerPortal: "Owner Portal",
+                ownerDash: "Owner Dashboard",
+                secretKeyPh: "Enter Owner Secret Key",
+                accessAdminBtn: "Access Admin Panel",
+                addClientTitle: "Add New Client Account",
+                clientEmailPh: "Client Email",
+                clientPassPh: "Client Password",
+                devNamePh: "Device Name (e.g. Living Room ESP)",
+                addClientBtn: "Add Client",
+                existingClients: "Existing Clients",
+                backToLogin: "← Back to Sign In",
+                signOut: "Sign Out",
+                stateOn: "ON",
+                stateOff: "OFF",
+                deleteDev: "✕ Delete Device",
+                noDevices: "No control buttons assigned. Click + to pair.",
+                tblEmail: "Email",
+                tblName: "Device Name",
+                tblAction: "Action",
+                delUser: "Delete User",
+                alertDelConf: "Are you sure you want to remove this device?",
+                alertDelESP: "Device deleted via ESP32 hardware button."
+            },
+            ar: {
+                langToggle: "🌐 English",
+                signInTitle: "تسجيل الدخول",
+                emailPh: "البريد الإلكتروني",
+                passPh: "كلمة المرور",
+                loginBtn: "دخول",
+                invalidCreds: "بيانات الاعتماد غير صالحة!",
+                ownerPortal: "بوابة المالك",
+                ownerDash: "لوحة تحكم المالك",
+                secretKeyPh: "أدخل المفتاح السري",
+                accessAdminBtn: "الدخول للوحة الإدارة",
+                addClientTitle: "إضافة حساب عميل جديد",
+                clientEmailPh: "بريد العميل",
+                clientPassPh: "كلمة مرور العميل",
+                devNamePh: "اسم الجهاز (مثال: صالة الجلوس)",
+                addClientBtn: "إضافة عميل",
+                existingClients: "العملاء الحاليين",
+                backToLogin: "العودة لتسجيل الدخول →",
+                signOut: "تسجيل الخروج",
+                stateOn: "تشغيل",
+                stateOff: "إيقاف",
+                deleteDev: "✕ حذف الجهاز",
+                noDevices: "لا توجد أزرار تحكم. اضغط على + للإقران.",
+                tblEmail: "البريد",
+                tblName: "اسم الجهاز",
+                tblAction: "إجراء",
+                delUser: "حذف المستخدم",
+                alertDelConf: "هل أنت متأكد أنك تريد حذف هذا الجهاز؟",
+                alertDelESP: "تم حذف الجهاز عبر زر ESP32."
+            }
         };
 
-        client.connect({
-            onSuccess: function() {
-                document.getElementById("mqttStatus").innerText = (currentLang === 'en') ? "MQTT Connected" : "متصل بالخادم";
-                document.getElementById("mqttStatus").style.color = "rgb(0, 162, 255)";
-            }
-        });
+        let currentLang = localStorage.getItem("preferredLang") || "en";
 
-        function showAddDeviceForm() {
-            document.getElementById('addDeviceForm').classList.toggle('hidden');
-        }
+        function applyLanguage() {
+            document.documentElement.lang = currentLang;
+            document.documentElement.dir = currentLang === "ar" ? "rtl" : "ltr";
+            document.getElementById("langToggleBtn").innerText = translations[currentLang].langToggle;
 
-        // Simulate reading QR code and sending payload to ESP32
-        function sendDeviceData() {
-            const nameEn = document.getElementById('devNameEn').value;
-            const nameAr = document.getElementById('devNameAr').value;
-            const pub = document.getElementById('devPub').value;
-            const sub = document.getElementById('devSub').value;
-            const mac = document.getElementById('devMac').value;
-
-            // Store it locally just to show on the website UI
-            latestDeviceData = { nameEn, nameAr };
-            
-            // Format identical to what ESP32 JSON parser expects
-            const payload = JSON.stringify({
-                nameEn: nameEn,
-                nameAr: nameAr,
-                pubTopic: pub,
-                subTopic: sub,
-                mac: mac
+            document.querySelectorAll("[data-i18n]").forEach(el => {
+                const key = el.getAttribute("data-i18n");
+                if (translations[currentLang][key]) el.innerText = translations[currentLang][key];
             });
 
-            // Send via MQTT
-            const message = new Paho.MQTT.Message(payload);
-            message.destinationName = setupTopic;
-            client.send(message);
+            document.querySelectorAll("[data-i18n-ph]").forEach(el => {
+                const key = el.getAttribute("data-i18n-ph");
+                if (translations[currentLang][key]) el.placeholder = translations[currentLang][key];
+            });
 
-            // Update UI
-            document.getElementById('addDeviceForm').classList.add('hidden');
-            document.getElementById('deviceList').classList.remove('hidden');
-            updateUI();
+            if (document.getElementById("controlSection").style.display !== "none") renderClientButtons();
+            if (document.getElementById("adminControls").style.display !== "none") verifyAdminKey(); // re-render table
         }
 
         function toggleLanguage() {
-            currentLang = (currentLang === 'en') ? 'ar' : 'en';
-            
-            // Flip the entire layout direction
-            document.documentElement.dir = (currentLang === 'ar') ? 'rtl' : 'ltr';
-            updateUI();
+            currentLang = currentLang === "en" ? "ar" : "en";
+            localStorage.setItem("preferredLang", currentLang);
+            applyLanguage();
         }
 
-        function updateUI() {
-            if (currentLang === 'ar') {
-                document.getElementById('langBtn').innerText = "English";
-                document.getElementById('titleText').innerText = "أجهزتي";
-                document.getElementById('formTitleText').innerText = "إضافة جهاز جديد";
-                document.getElementById('submitBtnText').innerText = "إضافة عبر MQTT";
-                
-                document.getElementById('devNameEn').placeholder = "اسم الجهاز (إنجليزي)";
-                document.getElementById('devNameAr').placeholder = "اسم الجهاز (عربي)";
-                document.getElementById('devPub').placeholder = "موضوع النشر (Publish)";
-                document.getElementById('devSub').placeholder = "موضوع الاشتراك (Subscribe)";
-                document.getElementById('devMac').placeholder = "عنوان MAC";
+        const broker = "broker.hivemq.com";
+        const port = 8884;
+        const API_URL = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") 
+            ? `http://${window.location.hostname}:3000/api` : `${window.location.origin}/api`;
 
-                if(client.isConnected()) {
-                    document.getElementById("mqttStatus").innerText = "متصل بالخادم";
-                }
-                
-                if(latestDeviceData) {
-                    document.getElementById('displayDeviceName').innerText = latestDeviceData.nameAr;
-                }
-            } else {
-                document.getElementById('langBtn').innerText = "عربي";
-                document.getElementById('titleText').innerText = "My Devices";
-                document.getElementById('formTitleText').innerText = "Add New Device";
-                document.getElementById('submitBtnText').innerText = "Add via MQTT";
-                
-                document.getElementById('devNameEn').placeholder = "Device Name (English)";
-                document.getElementById('devNameAr').placeholder = "Device Name (Arabic)";
-                document.getElementById('devPub').placeholder = "Publish Topic";
-                document.getElementById('devSub').placeholder = "Subscribe Topic";
-                document.getElementById('devMac').placeholder = "MAC Address";
+        let client = null;
+        let activeAccount = null;
+        let buttonStates = {};
+        let currentAdminKey = "";
+        let html5QrCodeScanner = null;
+        let holdTimer = null;
+        let isHoldTriggered = false;
+        let ignoreMouse = false;
 
-                if(client.isConnected()) {
-                    document.getElementById("mqttStatus").innerText = "MQTT Connected";
-                }
+        const loginSection = document.getElementById("loginSection");
+        const ownerSection = document.getElementById("ownerSection");
+        const controlSection = document.getElementById("controlSection");
+        const logoutBtn = document.getElementById("logoutBtn");
 
-                if(latestDeviceData) {
-                    document.getElementById('displayDeviceName').innerText = latestDeviceData.nameEn;
-                }
+        window.addEventListener("DOMContentLoaded", () => {
+            applyLanguage(); // Apply chosen language immediately
+            const savedUserData = localStorage.getItem("activeEspUser");
+            if (savedUserData) {
+                activeAccount = JSON.parse(savedUserData);
+                openDashboard();
             }
+        });
+
+        function showOwnerPanel() { loginSection.style.display = "none"; ownerSection.style.display = "flex"; }
+        function showLoginSection() { ownerSection.style.display = "none"; loginSection.style.display = "flex"; }
+
+        document.getElementById("loginForm").addEventListener("submit", async function(e) {
+            e.preventDefault();
+            const email = document.getElementById("loginEmail").value.trim().toLowerCase();
+            const password = document.getElementById("loginPassword").value;
+            const errorMsg = document.getElementById("loginErrorMsg");
+
+            try {
+                const res = await fetch(`${API_URL}/login`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    activeAccount = data.user;
+                    localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
+                    errorMsg.style.display = "none";
+                    openDashboard();
+                } else {
+                    errorMsg.innerText = data.message; errorMsg.style.display = "block";
+                }
+            } catch (err) {
+                errorMsg.innerText = "Cannot connect to server!"; errorMsg.style.display = "block";
+            }
+        });
+
+        // ADMIN
+        async function verifyAdminKey() {
+            const keyInput = document.getElementById("adminKeyInput").value || currentAdminKey;
+            if(!keyInput) return;
+            const authError = document.getElementById("adminAuthError");
+
+            try {
+                const res = await fetch(`${API_URL}/admin/users`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminKey: keyInput })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    currentAdminKey = keyInput;
+                    authError.style.display = "none";
+                    document.getElementById("adminAuthBox").style.display = "none";
+                    document.getElementById("adminControls").style.display = "block";
+                    renderUserList(data.users);
+                } else {
+                    authError.innerText = data.message; authError.style.display = "block";
+                }
+            } catch (err) {}
+        }
+
+        document.getElementById("adminAddForm").addEventListener("submit", async function(e) {
+            e.preventDefault();
+            const email = document.getElementById("newEmail").value.trim();
+            const password = document.getElementById("newPassword").value;
+            const title = document.getElementById("newTitle").value.trim();
+            const msgEl = document.getElementById("adminAddMsg");
+
+            try {
+                const res = await fetch(`${API_URL}/admin/add-user`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminKey: currentAdminKey, email, password, title })
+                });
+                const data = await res.json();
+                msgEl.innerText = data.message;
+                msgEl.style.color = data.success ? "#22c55e" : "#ef4444";
+                msgEl.style.display = "block";
+                if(data.success) { document.getElementById("adminAddForm").reset(); verifyAdminKey(); }
+            } catch (err) {}
+        });
+
+        function renderUserList(users) {
+            const container = document.getElementById("userListContainer");
+            if (!users || users.length === 0) {
+                container.innerHTML = `<p style='color: #888;'>No clients added yet.</p>`;
+                return;
+            }
+            let html = `<table class='admin-table'><tr>
+                <th>${translations[currentLang].tblEmail}</th>
+                <th>${translations[currentLang].tblName}</th>
+                <th>${translations[currentLang].tblAction}</th></tr>`;
+            users.forEach(u => {
+                html += `<tr><td><strong>${u.email}</strong></td><td>${u.title}</td>
+                    <td><button class='deleteBtn' onclick="deleteUser('${u.email}')">${translations[currentLang].delUser}</button></td></tr>`;
+            });
+            html += "</table>";
+            container.innerHTML = html;
+        }
+
+        async function deleteUser(email) {
+            if (!confirm(`Delete user: ${email}?`)) return;
+            try {
+                const res = await fetch(`${API_URL}/admin/delete-user`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminKey: currentAdminKey, targetEmail: email })
+                });
+                const data = await res.json();
+                if (data.success) verifyAdminKey(); else alert(data.message);
+            } catch (err) {}
+        }
+
+        // CLIENT DASHBOARD
+        function openDashboard() {
+            loginSection.style.display = "none"; ownerSection.style.display = "none";
+            controlSection.style.display = "flex"; logoutBtn.style.display = "block";
+            document.getElementById("deviceHeader").innerText = activeAccount.title;
+            renderClientButtons(); initMqttConnection();
+        }
+
+        function renderClientButtons() {
+            const container = document.getElementById("clientButtonsContainer");
+            container.innerHTML = "";
+            if (!activeAccount.buttons || activeAccount.buttons.length === 0) {
+                container.innerHTML = `<p style='color:#888;'>${translations[currentLang].noDevices}</p>`;
+                return;
+            }
+
+            activeAccount.buttons.forEach((b, index) => {
+                if (!(b.id in buttonStates)) buttonStates[b.id] = false;
+                const stateText = buttonStates[b.id] ? translations[currentLang].stateOn : translations[currentLang].stateOff;
+                
+                container.innerHTML += `
+                    <div class="device-card">
+                        <h3>${b.name}</h3>
+                        <button id="btn_${b.id}" class="authBtn appliance-btn" 
+                                oncontextmenu="return false;"
+                                onmousedown="startHold('${b.id}', event)" onmouseup="endHold('${b.id}', '${b.pubTopic}', event)" 
+                                onmouseleave="cancelHold()" ontouchstart="startHold('${b.id}', event)" 
+                                ontouchend="endHold('${b.id}', '${b.pubTopic}', event)" ontouchcancel="cancelHold()">
+                                ${stateText}</button>
+                        <button id="delBtn_${b.id}" class="delete-device-btn" style="display: none;" 
+                                onclick="deleteDevice('${b.id}', ${index})">${translations[currentLang].deleteDev}</button>
+                    </div>
+                `;
+            });
+        }
+
+        function startHold(buttonId, e) {
+            if (e && e.type === 'touchstart') ignoreMouse = true;
+            if (e && e.type === 'mousedown' && ignoreMouse) return;
+            isHoldTriggered = false;
+            holdTimer = setTimeout(() => {
+                isHoldTriggered = true;
+                const delBtn = document.getElementById(`delBtn_${buttonId}`);
+                if (delBtn) delBtn.style.display = (delBtn.style.display === "none") ? "block" : "none";
+            }, 1000);
+        }
+
+        function endHold(buttonId, pubTopic, e) {
+            if (e && e.type === 'touchend' && e.cancelable) e.preventDefault(); 
+            if (e && e.type === 'mouseup' && ignoreMouse) { ignoreMouse = false; return; }
+            clearTimeout(holdTimer);
+            if (!isHoldTriggered) toggleAppliance(buttonId, pubTopic);
+        }
+        function cancelHold() { clearTimeout(holdTimer); }
+
+        async function deleteDevice(buttonId, index, isFromESP32 = false) {
+            if (!isFromESP32 && !confirm(translations[currentLang].alertDelConf)) return;
+            try {
+                if (!isFromESP32 && client && client.isConnected()) {
+                    let delMsg = new Paho.Message(JSON.stringify({ index: index }));
+                    delMsg.destinationName = "esp32/setup/delete"; client.send(delMsg);
+                }
+                const res = await fetch(`${API_URL}/client/delete-button`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: activeAccount.email, buttonId: buttonId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    activeAccount.buttons = activeAccount.buttons.filter(b => b.id !== buttonId);
+                    localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
+                    renderClientButtons();
+                    if (isFromESP32) alert(translations[currentLang].alertDelESP);
+                }
+            } catch (err) {}
+        }
+
+        function initMqttConnection() {
+            const uniqueClientId = "web_client_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
+            client = new Paho.Client(broker, Number(port), "/mqtt", uniqueClientId);
+            
+            client.onMessageArrived = (msg) => {
+                if (msg.destinationName === "esp32/setup/delete") {
+                    try {
+                        const payload = JSON.parse(msg.payloadString);
+                        if (payload.source === "esp32" && payload.index >= 0) {
+                            if (activeAccount.buttons && activeAccount.buttons[payload.index]) {
+                                deleteDevice(activeAccount.buttons[payload.index].id, payload.index, true); 
+                            }
+                        }
+                    } catch(e) {}
+                    return; 
+                }
+                if (activeAccount.buttons) {
+                    const matchedBtn = activeAccount.buttons.find(b => b.subTopic === msg.destinationName);
+                    if (matchedBtn) {
+                        const state = (msg.payloadString === "1");
+                        buttonStates[matchedBtn.id] = state;
+                        const btnEl = document.getElementById(`btn_${matchedBtn.id}`);
+                        if (btnEl) btnEl.innerText = state ? translations[currentLang].stateOn : translations[currentLang].stateOff;
+                    }
+                }
+            };
+            client.connect({
+                useSSL: true, cleanSession: true, timeout: 10,
+                onSuccess: () => {
+                    client.subscribe("esp32/setup/delete");
+                    if (activeAccount.buttons) {
+                        activeAccount.buttons.forEach(b => {
+                            if (b.subTopic) client.subscribe(b.subTopic);
+                        });
+                    }
+                }
+            });
+        }
+
+        function toggleAppliance(buttonId, pubTopic) {
+            if (!client || !client.isConnected()) return;
+            let nextState = buttonStates[buttonId] ? "0" : "1";
+            let message = new Paho.Message(nextState);
+            message.destinationName = pubTopic;
+            client.send(message);
+            buttonStates[buttonId] = (nextState === "1");
+            const btnEl = document.getElementById(`btn_${buttonId}`);
+            if (btnEl) btnEl.innerText = buttonStates[buttonId] ? translations[currentLang].stateOn : translations[currentLang].stateOff;
+        }
+
+        function logout() {
+            localStorage.removeItem("activeEspUser");
+            if (client && client.isConnected()) client.disconnect();
+            activeAccount = null;
+            controlSection.style.display = "none"; logoutBtn.style.display = "none";
+            loginSection.style.display = "flex"; document.getElementById("loginForm").reset();
+        }
+
+        // QR SCANNER
+        function toggleQrScanner() {
+            const qrDiv = document.getElementById("qrReader");
+            if (qrDiv.style.display === "none") {
+                qrDiv.style.display = "block";
+                html5QrCodeScanner = new Html5Qrcode("qrReader");
+                html5QrCodeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onQrCodeScanned).catch(err => alert("Camera access error"));
+            } else { stopQrScanner(); }
+        }
+        function stopQrScanner() {
+            if (html5QrCodeScanner) html5QrCodeScanner.stop().then(() => { document.getElementById("qrReader").style.display = "none"; });
+        }
+        async function onQrCodeScanned(decodedText) {
+            stopQrScanner();
+            try {
+                const qrData = JSON.parse(decodedText);
+                if (qrData.pubTopic && qrData.subTopic) {
+                    const res = await fetch(`${API_URL}/admin/add-button`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            targetEmail: activeAccount.email, buttonName: qrData.name || "Device", 
+                            pubTopic: qrData.pubTopic, subTopic: qrData.subTopic, macAddr: qrData.mac || "FF:FF:FF:FF:FF:FF" 
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        if (!activeAccount.buttons) activeAccount.buttons = [];
+                        activeAccount.buttons.push(data.button);
+                        localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
+                        if (client && client.isConnected()) {
+                            client.subscribe(data.button.subTopic);
+                            let configMsg = new Paho.Message(JSON.stringify({name: qrData.name, pubTopic: qrData.pubTopic, subTopic: qrData.subTopic, mac: qrData.mac}));
+                            configMsg.destinationName = "esp32/setup/config"; client.send(configMsg);
+                        }
+                        renderClientButtons();
+                    }
+                }
+            } catch (e) {}
         }
     </script>
 </body>
