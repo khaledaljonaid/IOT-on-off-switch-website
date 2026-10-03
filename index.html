@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KAD IoT Dashboard</title>
+    <title>KAD Smart Device Control</title>
     <script src="https://cdn.jsdelivr.net/npm/paho-mqtt@1.1.0/paho-mqtt.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <link rel="stylesheet" href="style.css">
@@ -12,7 +12,7 @@
 
     <header dir="ltr">
         <div class="logo">
-            <img src="Screenshot_2026-07-18_220821-removebg-preview.png" alt="KAD Logo">
+            <img src="Screenshot_2026-07-18_220821-removebg-preview.png" alt="logo">
         </div>
         <div class="header-buttons">
             <button class="small-btn" id="langToggleBtn" onclick="toggleLanguage()" dir="auto">🌐 عربي</button>
@@ -20,50 +20,43 @@
         </div>
     </header>
 
-    <!-- 1. SIGN IN SECTION -->
+    <!-- LOGIN SECTION -->
     <div id="loginSection">
         <div class="form-container">
             <h1 data-i18n="signInTitle">Sign In</h1>
             <form id="loginForm">
                 <input type="email" id="loginEmail" data-i18n-ph="emailPh" placeholder="Email" required><br>
-                <input type="password" id="loginPassword" data-i18n-ph="passPh" placeholder="Password"><br>
+                <input type="password" id="loginPassword" data-i18n-ph="passPh" placeholder="Password" required><br>
                 <button type="submit" class="authBtn" data-i18n="loginBtn">Login</button>
             </form>
             <p id="loginErrorMsg" class="error-text" style="display: none;" data-i18n="invalidCreds">Invalid credentials!</p>
         </div>
     </div>
 
-    <!-- 2. SENDERS (DEVICES) SECTION -->
+    <!-- SENDERS PAGE (DEVICES) -->
     <div id="sendersSection" style="display: none;">
-        <button class="scan-plus-btn" onclick="startScanner('sender')" title="Add Device Sender">+</button>
-        <h1 data-i18n="myDevices">My Devices</h1>
-        <div id="sendersContainer" class="sender-grid"></div>
+        <button class="scan-plus-btn" onclick="startScanner('sender')" title="Add Sender Device">+</button>
+        <h1 data-i18n="mySendersTitle">My Devices (Senders)</h1>
+        <div id="senderQrReader" class="qr-box" style="display: none;"></div>
+        <div id="sendersContainer" class="squares-wrapper"></div>
     </div>
 
-    <!-- 3. RECEIVERS CONTROL SECTION -->
+    <!-- RECEIVERS PAGE (APPLIANCES) -->
     <div id="receiversSection" style="display: none;">
-        <button class="back-btn" onclick="showSendersSection()"><span data-i18n="backBtn">← Back</span></button>
+        <button class="small-btn back-btn" onclick="showSendersSection()" data-i18n="backToSenders">← Back to Devices</button>
         <button class="scan-plus-btn" onclick="startScanner('receiver')" title="Add Receiver">+</button>
-        <h1 id="currentSenderTitle">Receiver Control</h1>
-        <div id="receiversContainer" class="receiver-grid"></div>
+        <h1 id="deviceHeader">Appliance Control</h1>
+        <div id="receiverQrReader" class="qr-box" style="display: none;"></div>
+        <div id="clientButtonsContainer"></div>
     </div>
 
-    <!-- SCANNER OVERLAY MODAL -->
-    <div id="scannerModal" class="modal-overlay" style="display: none;">
-        <div class="modal-card">
-            <h2 data-i18n="scanQrTitle">Scan QR Code</h2>
-            <div id="qrReader"></div>
-            <button class="small-btn cancel-btn" onclick="stopQrScanner()" data-i18n="cancelBtn">Cancel</button>
-        </div>
-    </div>
-
-    <!-- CUSTOM DEVICE NAME INPUT MODAL -->
-    <div id="nameInputModal" class="modal-overlay" style="display: none;">
-        <div class="modal-card">
-            <h2 id="nameModalTitle" data-i18n="enterDevName">Enter Device Name</h2>
-            <input type="text" id="customNameInput" placeholder="Name" required><br>
-            <button class="authBtn" onclick="submitCustomName()" data-i18n="saveBtn">Save Device</button>
-            <button class="small-btn cancel-btn" onclick="closeNameModal()" data-i18n="cancelBtn" style="margin-top:8px;">Cancel</button>
+    <!-- NAME INPUT MODAL -->
+    <div id="nameModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content form-container">
+            <h2 id="modalTitle">Name Device</h2>
+            <input type="text" id="modalNameInput" placeholder="Enter device name..." required><br>
+            <button class="authBtn" onclick="submitNameModal()" data-i18n="saveBtn">Save</button>
+            <button class="small-btn" style="margin-top: 10px;" onclick="closeNameModal()" data-i18n="cancelBtn">Cancel</button>
         </div>
     </div>
 
@@ -77,18 +70,19 @@
                 loginBtn: "Login",
                 invalidCreds: "Invalid credentials!",
                 signOut: "Sign Out",
-                myDevices: "My Devices",
-                backBtn: "← Back",
+                mySendersTitle: "My Devices (Senders)",
+                backToSenders: "← Back to Devices",
                 stateOn: "ON",
                 stateOff: "OFF",
-                deleteDev: "✕ Delete",
-                noSenders: "No device senders paired yet. Click + to add one.",
-                noReceivers: "No receivers added to this sender. Click + to pair.",
-                scanQrTitle: "Scan Device QR Code",
-                enterDevName: "Enter Device Name",
+                deleteDev: "✕ Delete Device",
+                noSenders: "No Sender devices added yet. Click + to scan and pair a Sender.",
+                noReceivers: "No Receivers added to this Sender yet. Click + to scan and pair a Receiver.",
+                alertDelConf: "Are you sure you want to remove this item?",
+                nameSenderModalTitle: "Name Your Sender Device",
+                nameReceiverModalTitle: "Name Your Receiver Device",
                 saveBtn: "Save",
                 cancelBtn: "Cancel",
-                alertDelConf: "Are you sure you want to remove this item?"
+                invalidQr: "Invalid QR code format. Please scan a valid device QR code."
             },
             ar: {
                 langToggle: "🌐 English",
@@ -98,36 +92,23 @@
                 loginBtn: "دخول",
                 invalidCreds: "بيانات الاعتماد غير صالحة!",
                 signOut: "تسجيل الخروج",
-                myDevices: "أجهزتي",
-                backBtn: "العودة →",
+                mySendersTitle: "أجهزتي (أجهزة الإرسال)",
+                backToSenders: "العودة للأجهزة →",
                 stateOn: "تشغيل",
                 stateOff: "إيقاف",
-                deleteDev: "✕ حذف",
-                noSenders: "لا توجد أجهزة مرسلة مضافة. اضغط + للإضافة.",
-                noReceivers: "لا توجد أجهزة مستقبلة. اضغط + للإقران.",
-                scanQrTitle: "امسح رمز QR للجهاز",
-                enterDevName: "أدخل اسم الجهاز",
+                deleteDev: "✕ حذف الجهاز",
+                noSenders: "لا توجد أجهزة إرسال. اضغط على + لإضافة جهاز إرسال جديد.",
+                noReceivers: "لا توجد أجهزة استقبال. اضغط على + لإضافة جهاز استقبال جديد.",
+                alertDelConf: "هل أنت متأكد من الحذف؟",
+                nameSenderModalTitle: "تسمية جهاز الإرسال",
+                nameReceiverModalTitle: "تسمية جهاز الاستقبال",
                 saveBtn: "حفظ",
                 cancelBtn: "إلغاء",
-                alertDelConf: "هل أنت متأكد من حذف هذا العنصر؟"
+                invalidQr: "صيغة رمز QR غير صالحة. يرجى مسح رمز صحيح."
             }
         };
 
         let currentLang = localStorage.getItem("preferredLang") || "en";
-        const broker = "broker.hivemq.com";
-        const port = 8884;
-        const API_URL = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") 
-            ? `http://${window.location.hostname}:3000/api` : `${window.location.origin}/api`;
-
-        let client = null;
-        let activeAccount = null;
-        let activeSender = null;
-        let scanMode = "";
-        let pendingQrData = null;
-        let html5QrCodeScanner = null;
-        let receiverStates = {};
-        let holdTimer = null;
-        let isHoldTriggered = false;
 
         function applyLanguage() {
             document.documentElement.lang = currentLang;
@@ -154,8 +135,29 @@
             applyLanguage();
         }
 
+        const broker = "broker.hivemq.com";
+        const port = 8884;
+        const API_URL = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") 
+            ? `http://${window.location.hostname}:3000/api` : `${window.location.origin}/api`;
+
+        let client = null;
+        let activeAccount = null;
+        let activeSender = null;
+        let buttonStates = {};
+        let html5QrCodeScanner = null;
+        let pendingQrData = null;
+        let currentScanMode = null; 
+        let holdTimer = null;
+        let isHoldTriggered = false;
+        let ignoreMouse = false;
+
+        const loginSection = document.getElementById("loginSection");
+        const sendersSection = document.getElementById("sendersSection");
+        const receiversSection = document.getElementById("receiversSection");
+        const logoutBtn = document.getElementById("logoutBtn");
+
         window.addEventListener("DOMContentLoaded", () => {
-            applyLanguage();
+            applyLanguage(); 
             const savedUserData = localStorage.getItem("activeEspUser");
             if (savedUserData) {
                 activeAccount = JSON.parse(savedUserData);
@@ -189,242 +191,317 @@
         });
 
         function openDashboard() {
-            document.getElementById("loginSection").style.display = "none";
-            document.getElementById("logoutBtn").style.display = "block";
+            loginSection.style.display = "none";
+            receiversSection.style.display = "none";
+            sendersSection.style.display = "flex";
+            logoutBtn.style.display = "block";
+            renderSenders();
             initMqttConnection();
-            showSendersSection();
         }
 
         function showSendersSection() {
+            stopQrScanner();
+            receiversSection.style.display = "none";
+            sendersSection.style.display = "flex";
             activeSender = null;
-            document.getElementById("receiversSection").style.display = "none";
-            document.getElementById("sendersSection").style.display = "flex";
             renderSenders();
-        }
-
-        function showReceiversSection(sender) {
-            activeSender = sender;
-            document.getElementById("sendersSection").style.display = "none";
-            document.getElementById("receiversSection").style.display = "flex";
-            document.getElementById("currentSenderTitle").innerText = sender.name;
-            renderReceivers();
         }
 
         function renderSenders() {
             const container = document.getElementById("sendersContainer");
             container.innerHTML = "";
+
             if (!activeAccount.senders || activeAccount.senders.length === 0) {
-                container.innerHTML = `<p style='color:#888;'>${translations[currentLang].noSenders}</p>`;
+                container.innerHTML = `<p style='color:#888; margin-top:20px;'>${translations[currentLang].noSenders}</p>`;
                 return;
             }
 
-            activeAccount.senders.forEach((s) => {
+            activeAccount.senders.forEach((sender) => {
                 const card = document.createElement("div");
                 card.className = "sender-square";
                 card.innerHTML = `
-                    <div class="icon">⚡</div>
-                    <div class="title">${s.name}</div>
-                    <button class="delete-device-btn del-sender-btn" onclick="event.stopPropagation(); deleteSender('${s.id}')">${translations[currentLang].deleteDev}</button>
+                    <div class="sender-title">${sender.name}</div>
+                    <div class="sender-id">${sender.id}</div>
+                    <button class="delete-device-btn" onclick="event.stopPropagation(); deleteSender('${sender.id}')">${translations[currentLang].deleteDev}</button>
                 `;
-                card.onclick = () => showReceiversSection(s);
+                card.onclick = () => openSenderReceivers(sender);
                 container.appendChild(card);
             });
         }
 
-        function renderReceivers() {
-            const container = document.getElementById("receiversContainer");
-            container.innerHTML = "";
-            if (!activeSender || !activeSender.receivers || activeSender.receivers.length === 0) {
-                container.innerHTML = `<p style='color:#888;'>${translations[currentLang].noReceivers}</p>`;
-                return;
-            }
-
-            activeSender.receivers.forEach((r) => {
-                if (!(r.id in receiverStates)) receiverStates[r.id] = false;
-                const stateText = receiverStates[r.id] ? translations[currentLang].stateOn : translations[currentLang].stateOff;
-
-                const card = document.createElement("div");
-                card.className = "device-card";
-                card.innerHTML = `
-                    <h3>${r.name}</h3>
-                    <button id="btn_${r.id}" class="authBtn appliance-btn"
-                            oncontextmenu="return false;"
-                            onmousedown="startHold('${r.id}', event)" 
-                            onmouseup="endHold('${r.id}', '${r.mac}', '${r.name}', event)"
-                            ontouchstart="startHold('${r.id}', event)" 
-                            ontouchend="endHold('${r.id}', '${r.mac}', '${r.name}', event)">
-                            ${stateText}</button>
-                    <button id="delBtn_${r.id}" class="delete-device-btn" style="display: none;" 
-                            onclick="deleteReceiver('${r.id}')">${translations[currentLang].deleteDev}</button>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        function startHold(id, e) {
-            isHoldTriggered = false;
-            holdTimer = setTimeout(() => {
-                isHoldTriggered = true;
-                const delBtn = document.getElementById(`delBtn_${id}`);
-                if (delBtn) delBtn.style.display = (delBtn.style.display === "none") ? "block" : "none";
-            }, 1000);
-        }
-
-        function endHold(id, mac, name, e) {
-            clearTimeout(holdTimer);
-            if (!isHoldTriggered) toggleReceiver(id, mac, name);
-        }
-
-        function toggleReceiver(id, mac, name) {
-            if (!client || !client.isConnected() || !activeSender) return;
-            const nextState = receiverStates[id] ? "0" : "1";
-
-            const payload = JSON.stringify({
-                action: "toggle",
-                mac: mac,
-                name: name,
-                state: nextState === "1" ? 1 : 0
-            });
-
-            let message = new Paho.Message(payload);
-            message.destinationName = `esp32/${activeSender.id}/setup/config`;
-            client.send(message);
-
-            receiverStates[id] = (nextState === "1");
-            const btnEl = document.getElementById(`btn_${id}`);
-            if (btnEl) btnEl.innerText = receiverStates[id] ? translations[currentLang].stateOn : translations[currentLang].stateOff;
+        function openSenderReceivers(sender) {
+            stopQrScanner();
+            activeSender = sender;
+            sendersSection.style.display = "none";
+            receiversSection.style.display = "flex";
+            document.getElementById("deviceHeader").innerText = sender.name;
+            renderReceivers();
         }
 
         async function deleteSender(senderId) {
             if (!confirm(translations[currentLang].alertDelConf)) return;
             try {
-                const res = await fetch(`${API_URL}/client/delete-sender`, {
+                const res = await fetch(`${API_URL}/delete-sender`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: activeAccount.email, senderId })
                 });
                 const data = await res.json();
                 if (data.success) {
-                    activeAccount.senders = activeAccount.senders.filter(s => s.id !== senderId);
+                    activeAccount.senders = data.senders;
                     localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
                     renderSenders();
                 }
-            } catch (err) {}
+            } catch (e) {}
         }
+
+        function renderReceivers() {
+            const container = document.getElementById("clientButtonsContainer");
+            container.innerHTML = "";
+
+            if (!activeSender || !activeSender.receivers || activeSender.receivers.length === 0) {
+                container.innerHTML = `<p style='color:#888; margin-top:20px;'>${translations[currentLang].noReceivers}</p>`;
+                return;
+            }
+
+            activeSender.receivers.forEach((rcv) => {
+                if (!(rcv.id in buttonStates)) buttonStates[rcv.id] = false;
+                const stateText = buttonStates[rcv.id] ? translations[currentLang].stateOn : translations[currentLang].stateOff;
+
+                container.innerHTML += `
+                    <div class="device-card">
+                        <h3>${rcv.name}</h3>
+                        <button id="btn_${rcv.id}" class="authBtn appliance-btn" 
+                                oncontextmenu="return false;"
+                                onmousedown="startHold('${rcv.id}', event)" onmouseup="endHold('${rcv.id}', '${rcv.pubTopic}', event)" 
+                                onmouseleave="cancelHold()" ontouchstart="startHold('${rcv.id}', event)" 
+                                ontouchend="endHold('${rcv.id}', '${rcv.pubTopic}', event)" ontouchcancel="cancelHold()">
+                                ${stateText}</button>
+                        <button id="delBtn_${rcv.id}" class="delete-device-btn" style="display: none;" 
+                                onclick="deleteReceiver('${rcv.id}')">${translations[currentLang].deleteDev}</button>
+                    </div>
+                `;
+            });
+        }
+
+        function startHold(buttonId, e) {
+            if (e && e.type === 'touchstart') ignoreMouse = true;
+            if (e && e.type === 'mousedown' && ignoreMouse) return;
+            isHoldTriggered = false;
+            holdTimer = setTimeout(() => {
+                isHoldTriggered = true;
+                const delBtn = document.getElementById(`delBtn_${buttonId}`);
+                if (delBtn) delBtn.style.display = (delBtn.style.display === "none") ? "block" : "none";
+            }, 1000);
+        }
+
+        function endHold(buttonId, pubTopic, e) {
+            if (e && e.type === 'touchend' && e.cancelable) e.preventDefault(); 
+            if (e && e.type === 'mouseup' && ignoreMouse) { ignoreMouse = false; return; }
+            clearTimeout(holdTimer);
+            if (!isHoldTriggered) toggleAppliance(buttonId, pubTopic);
+        }
+        function cancelHold() { clearTimeout(holdTimer); }
 
         async function deleteReceiver(receiverId) {
             if (!confirm(translations[currentLang].alertDelConf)) return;
             try {
-                const res = await fetch(`${API_URL}/client/delete-receiver`, {
+                const res = await fetch(`${API_URL}/delete-receiver`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: activeAccount.email, senderId: activeSender.id, receiverId })
                 });
                 const data = await res.json();
                 if (data.success) {
-                    activeSender.receivers = activeSender.receivers.filter(r => r.id !== receiverId);
+                    activeSender.receivers = data.receivers;
+                    const senderIdx = activeAccount.senders.findIndex(s => s.id === activeSender.id);
+                    if (senderIdx !== -1) activeAccount.senders[senderIdx].receivers = data.receivers;
                     localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
+
+                    if (client && client.isConnected()) {
+                        let delMsg = new Paho.Message(JSON.stringify({ receiverId }));
+                        delMsg.destinationName = `esp32/${activeSender.id}/setup/delete`;
+                        client.send(delMsg);
+                    }
+
                     renderReceivers();
                 }
-            } catch (err) {}
+            } catch (e) {}
         }
 
         function initMqttConnection() {
             const uniqueClientId = "web_client_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
             client = new Paho.Client(broker, Number(port), "/mqtt", uniqueClientId);
+            
+            client.onMessageArrived = (msg) => {
+                if (activeAccount && activeAccount.senders) {
+                    activeAccount.senders.forEach(s => {
+                        if (s.receivers) {
+                            const matchedRcv = s.receivers.find(r => r.subTopic === msg.destinationName);
+                            if (matchedRcv) {
+                                const state = (msg.payloadString === "1");
+                                buttonStates[matchedRcv.id] = state;
+                                const btnEl = document.getElementById(`btn_${matchedRcv.id}`);
+                                if (btnEl) btnEl.innerText = state ? translations[currentLang].stateOn : translations[currentLang].stateOff;
+                            }
+                        }
+                    });
+                }
+            };
 
             client.connect({
                 useSSL: true, cleanSession: true, timeout: 10,
-                onSuccess: () => { console.log("MQTT Connected"); }
+                onSuccess: () => {
+                    if (activeAccount && activeAccount.senders) {
+                        activeAccount.senders.forEach(s => {
+                            if (s.receivers) {
+                                s.receivers.forEach(r => {
+                                    if (r.subTopic) client.subscribe(r.subTopic);
+                                });
+                            }
+                        });
+                    }
+                }
             });
+        }
+
+        function toggleAppliance(buttonId, pubTopic) {
+            if (!client || !client.isConnected()) return;
+            let nextState = buttonStates[buttonId] ? "0" : "1";
+            let message = new Paho.Message(nextState);
+            message.destinationName = pubTopic;
+            client.send(message);
+            buttonStates[buttonId] = (nextState === "1");
+            const btnEl = document.getElementById(`btn_${buttonId}`);
+            if (btnEl) btnEl.innerText = buttonStates[buttonId] ? translations[currentLang].stateOn : translations[currentLang].stateOff;
         }
 
         function logout() {
             localStorage.removeItem("activeEspUser");
             if (client && client.isConnected()) client.disconnect();
             activeAccount = null;
-            document.getElementById("sendersSection").style.display = "none";
-            document.getElementById("receiversSection").style.display = "none";
-            document.getElementById("logoutBtn").style.display = "none";
-            document.getElementById("loginSection").style.display = "flex";
+            activeSender = null;
+            sendersSection.style.display = "none";
+            receiversSection.style.display = "none";
+            logoutBtn.style.display = "none";
+            loginSection.style.display = "flex";
             document.getElementById("loginForm").reset();
         }
 
         function startScanner(mode) {
-            scanMode = mode;
-            document.getElementById("scannerModal").style.display = "flex";
-            html5QrCodeScanner = new Html5Qrcode("qrReader");
-            html5QrCodeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 220 }, onQrScanned);
+            currentScanMode = mode;
+            const readerDivId = mode === 'sender' ? "senderQrReader" : "receiverQrReader";
+            const qrDiv = document.getElementById(readerDivId);
+
+            if (qrDiv.style.display === "none") {
+                qrDiv.style.display = "block";
+                html5QrCodeScanner = new Html5Qrcode(readerDivId);
+                html5QrCodeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onQrScanned)
+                    .catch(() => alert("Camera access error"));
+            } else {
+                stopQrScanner();
+            }
         }
 
         function stopQrScanner() {
             if (html5QrCodeScanner) {
                 html5QrCodeScanner.stop().then(() => {
-                    document.getElementById("scannerModal").style.display = "none";
-                });
-            } else {
-                document.getElementById("scannerModal").style.display = "none";
+                    document.getElementById("senderQrReader").style.display = "none";
+                    document.getElementById("receiverQrReader").style.display = "none";
+                    html5QrCodeScanner = null;
+                }).catch(() => {});
             }
         }
 
         function onQrScanned(decodedText) {
             stopQrScanner();
             try {
-                pendingQrData = JSON.parse(decodedText);
-                document.getElementById("customNameInput").value = "";
-                document.getElementById("nameInputModal").style.display = "flex";
-            } catch(e) {
-                alert("Invalid QR format. Expecting JSON.");
+                const qrData = JSON.parse(decodedText);
+                pendingQrData = qrData;
+                
+                if (currentScanMode === 'sender' && (qrData.id || qrData.senderId)) {
+                    showNameModal(translations[currentLang].nameSenderModalTitle);
+                } else if (currentScanMode === 'receiver' && qrData.mac) {
+                    showNameModal(translations[currentLang].nameReceiverModalTitle);
+                } else {
+                    alert(translations[currentLang].invalidQr);
+                }
+            } catch (e) {
+                alert(translations[currentLang].invalidQr);
             }
+        }
+
+        function showNameModal(titleText) {
+            document.getElementById("modalTitle").innerText = titleText;
+            document.getElementById("modalNameInput").value = "";
+            document.getElementById("nameModal").style.display = "flex";
         }
 
         function closeNameModal() {
-            document.getElementById("nameInputModal").style.display = "none";
+            document.getElementById("nameModal").style.display = "none";
             pendingQrData = null;
         }
 
-        async function submitCustomName() {
-            const name = document.getElementById("customNameInput").value.trim();
-            if (!name || !pendingQrData) return;
+        async function submitNameModal() {
+            const chosenName = document.getElementById("modalNameInput").value.trim();
+            if (!chosenName) return;
 
-            if (scanMode === "sender") {
-                const senderId = pendingQrData.id || ("SND-" + Date.now().toString().slice(-4));
-                const res = await fetch(`${API_URL}/client/add-sender`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: activeAccount.email, senderId, senderName: name })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    if (!activeAccount.senders) activeAccount.senders = [];
-                    activeAccount.senders.push(data.sender);
-                    localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
-                    renderSenders();
-                }
-            } else if (scanMode === "receiver" && activeSender) {
-                const mac = pendingQrData.mac || "FF:FF:FF:FF:FF:FF";
-                const res = await fetch(`${API_URL}/client/add-receiver`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: activeAccount.email, senderId: activeSender.id, mac, receiverName: name })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    if (!activeSender.receivers) activeSender.receivers = [];
-                    activeSender.receivers.push(data.receiver);
-                    localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
-                    
-                    // Transmit configuration to Sender via MQTT
-                    if (client && client.isConnected()) {
-                        const payload = JSON.stringify({
-                            action: "add_receiver",
-                            mac: mac,
-                            name: name
-                        });
-                        let msg = new Paho.Message(payload);
-                        msg.destinationName = `esp32/${activeSender.id}/setup/config`;
-                        client.send(msg);
+            if (currentScanMode === 'sender') {
+                const senderId = pendingQrData.id || pendingQrData.senderId;
+                try {
+                    const res = await fetch(`${API_URL}/add-sender`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            email: activeAccount.email,
+                            senderId: senderId,
+                            name: chosenName
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        activeAccount.senders = data.senders;
+                        localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
+                        closeNameModal();
+                        renderSenders();
                     }
-                    renderReceivers();
-                }
+                } catch(e) {}
+            } 
+            else if (currentScanMode === 'receiver') {
+                try {
+                    const res = await fetch(`${API_URL}/add-receiver`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            email: activeAccount.email,
+                            senderId: activeSender.id,
+                            mac: pendingQrData.mac,
+                            name: chosenName
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        const newRcv = data.receiver;
+                        activeSender.receivers = data.receivers;
+                        
+                        const senderIdx = activeAccount.senders.findIndex(s => s.id === activeSender.id);
+                        if (senderIdx !== -1) activeAccount.senders[senderIdx].receivers = data.receivers;
+                        localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
+
+                        if (client && client.isConnected()) {
+                            client.subscribe(newRcv.subTopic);
+                            
+                            let configMsg = new Paho.Message(JSON.stringify({
+                                name: newRcv.name,
+                                pubTopic: newRcv.pubTopic,
+                                subTopic: newRcv.subTopic,
+                                mac: newRcv.mac
+                            }));
+                            configMsg.destinationName = `esp32/${activeSender.id}/setup/config`;
+                            client.send(configMsg);
+                        }
+
+                        closeNameModal();
+                        renderReceivers();
+                    }
+                } catch(e) {}
             }
-            closeNameModal();
         }
     </script>
 </body>
