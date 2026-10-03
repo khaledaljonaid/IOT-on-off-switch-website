@@ -12,7 +12,6 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(__dirname));
 
-// Helper Functions for Data Storage
 function loadUsers() {
     if (!fs.existsSync(DATA_FILE)) {
         fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2));
@@ -37,90 +36,82 @@ function saveUsers(users) {
     }
 }
 
-// 1. CLIENT LOGIN / EMAIL VERIFICATION
+// 1. CLIENT LOGIN / AUTO-REGISTER
 app.post('/api/login', (req, res) => {
     const { email, password } = req.body;
-    if (!email) {
-        return res.status(400).json({ success: false, message: "Email is required." });
-    }
+    if (!email) return res.status(400).json({ success: false, message: "Email is required." });
 
+    const users = loadUsers();
     const normalizedEmail = email.toLowerCase().trim();
-    let users = loadUsers();
     let user = users.find(u => u.email.toLowerCase() === normalizedEmail);
 
-    if (!user) {
-        user = {
-            email: normalizedEmail,
-            password: password || "",
-            title: normalizedEmail.split('@')[0],
-            senders: []
-        };
+    if (user) {
+        if (password && user.password && user.password !== password) {
+            return res.status(401).json({ success: false, message: "Invalid credentials." });
+        }
+    } else {
+        user = { email: normalizedEmail, password: password || "", senders: [] };
         users.push(user);
         saveUsers(users);
-    } else if (password && user.password && user.password !== password) {
-        return res.status(401).json({ success: false, message: "Invalid password." });
     }
 
     return res.json({
         success: true,
-        user: {
-            email: user.email,
-            title: user.title,
-            senders: user.senders || []
-        }
+        user: { email: user.email, senders: user.senders || [] }
     });
 });
 
-// 2. ADD SENDER (DEVICE)
-app.post('/api/client/add-sender', (req, res) => {
-    const { email, senderId, senderName } = req.body;
-    if (!email || !senderId || !senderName) {
-        return res.status(400).json({ success: false, message: "Missing required sender details." });
+// 2. ADD SENDER DEVICE
+app.post('/api/add-sender', (req, res) => {
+    const { email, senderId, name } = req.body;
+    if (!email || !senderId || !name) {
+        return res.status(400).json({ success: false, message: "Missing required fields." });
     }
 
     let users = loadUsers();
-    const userIndex = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase().trim());
-    if (userIndex === -1) {
-        return res.status(404).json({ success: false, message: "Client account not found." });
-    }
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
+    if (!user) return res.status(404).json({ success: false, message: "User not found." });
 
-    if (!users[userIndex].senders) users[userIndex].senders = [];
+    if (!user.senders) user.senders = [];
 
-    let existingSender = users[userIndex].senders.find(s => s.id === senderId);
-    if (existingSender) {
-        existingSender.name = senderName;
+    let sender = user.senders.find(s => s.id === senderId);
+    if (sender) {
+        sender.name = name;
     } else {
-        existingSender = {
-            id: senderId,
-            name: senderName,
-            pubTopic: `esp32/${senderId}/setup/config`,
-            subTopic: `esp32/${senderId}/state`,
-            receivers: []
-        };
-        users[userIndex].senders.push(existingSender);
+        sender = { id: senderId, name: name, receivers: [] };
+        user.senders.push(sender);
     }
 
-    saveUsers(users);
-    return res.json({ success: true, sender: existingSender });
+    if (saveUsers(users)) {
+        return res.json({ success: true, message: "Sender device added.", sender: sender, senders: user.senders });
+    } else {
+        return res.status(500).json({ success: false, message: "Failed to save sender." });
+    }
 });
 
-// 3. DELETE SENDER
-app.post('/api/client/delete-sender', (req, res) => {
+// 3. DELETE SENDER DEVICE
+app.post('/api/delete-sender', (req, res) => {
     const { email, senderId } = req.body;
     let users = loadUsers();
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
     if (!user) return res.status(404).json({ success: false, message: "User not found." });
 
-    user.senders = (user.senders || []).filter(s => s.id !== senderId);
-    saveUsers(users);
-    return res.json({ success: true, message: "Sender deleted successfully." });
+    if (user.senders) {
+        user.senders = user.senders.filter(s => s.id !== senderId);
+    }
+
+    if (saveUsers(users)) {
+        return res.json({ success: true, message: "Sender deleted.", senders: user.senders });
+    } else {
+        return res.status(500).json({ success: false, message: "Failed to delete sender." });
+    }
 });
 
 // 4. ADD RECEIVER TO SENDER
-app.post('/api/client/add-receiver', (req, res) => {
-    const { email, senderId, mac, receiverName } = req.body;
-    if (!email || !senderId || !mac || !receiverName) {
-        return res.status(400).json({ success: false, message: "Missing receiver details." });
+app.post('/api/add-receiver', (req, res) => {
+    const { email, senderId, mac, name } = req.body;
+    if (!email || !senderId || !mac || !name) {
+        return res.status(400).json({ success: false, message: "Missing required fields." });
     }
 
     let users = loadUsers();
@@ -132,23 +123,29 @@ app.post('/api/client/add-receiver', (req, res) => {
 
     if (!sender.receivers) sender.receivers = [];
 
+    const cleanMac = mac.replace(/[^a-fA-F0-9]/g, '').toUpperCase();
+    const pubTopic = `esp32/${senderId}/mac_${cleanMac}/set`;
+    const subTopic = `esp32/${senderId}/mac_${cleanMac}/state`;
+
     const newReceiver = {
         id: "rcv_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
-        name: receiverName,
         mac: mac,
-        pubTopic: `esp32/${senderId}/receiver/${mac}/set`,
-        subTopic: `esp32/${senderId}/receiver/${mac}/state`,
-        state: false
+        name: name,
+        pubTopic: pubTopic,
+        subTopic: subTopic
     };
 
     sender.receivers.push(newReceiver);
-    saveUsers(users);
 
-    return res.json({ success: true, receiver: newReceiver });
+    if (saveUsers(users)) {
+        return res.json({ success: true, message: "Receiver added.", receiver: newReceiver, receivers: sender.receivers });
+    } else {
+        return res.status(500).json({ success: false, message: "Failed to save receiver." });
+    }
 });
 
 // 5. DELETE RECEIVER FROM SENDER
-app.post('/api/client/delete-receiver', (req, res) => {
+app.post('/api/delete-receiver', (req, res) => {
     const { email, senderId, receiverId } = req.body;
     let users = loadUsers();
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
@@ -157,12 +154,17 @@ app.post('/api/client/delete-receiver', (req, res) => {
     const sender = (user.senders || []).find(s => s.id === senderId);
     if (!sender) return res.status(404).json({ success: false, message: "Sender not found." });
 
-    sender.receivers = (sender.receivers || []).filter(r => r.id !== receiverId);
-    saveUsers(users);
+    if (sender.receivers) {
+        sender.receivers = sender.receivers.filter(r => r.id !== receiverId);
+    }
 
-    return res.json({ success: true, message: "Receiver deleted successfully." });
+    if (saveUsers(users)) {
+        return res.json({ success: true, message: "Receiver deleted.", receivers: sender.receivers });
+    } else {
+        return res.status(500).json({ success: false, message: "Failed to delete receiver." });
+    }
 });
 
 app.listen(PORT, () => {
-    console.log(`ESP32 Controller Server running on http://localhost:${PORT}`);
+    console.log(`Server running on http://localhost:${PORT}`);
 });
