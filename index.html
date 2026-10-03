@@ -1,513 +1,190 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 Control</title>
-    <script src="https://cdn.jsdelivr.net/npm/paho-mqtt@1.1.0/paho-mqtt.min.js"></script>
-    <script src="https://unpkg.com/html5-qrcode"></script>
-    <link rel="stylesheet" href="style.css">
+    <title>Smart Device Manager</title>
+    <!-- Include QR Scanner and MQTT -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .hidden { display: none !important; }
+        .sender-square {
+            width: 120px; height: 120px; border: 2px solid #007BFF; border-radius: 8px;
+            display: inline-flex; align-items: center; justify-content: center;
+            margin: 10px; cursor: pointer; background-color: #f8f9fa; text-align: center;
+            font-weight: bold; transition: 0.2s;
+        }
+        .sender-square:hover { background-color: #007BFF; color: white; }
+        .receiver-btn {
+            padding: 15px 30px; margin: 10px; cursor: pointer;
+            background-color: #28a745; color: white; border: none; border-radius: 5px; font-size: 16px;
+        }
+        #reader { width: 300px; margin: 20px 0; }
+    </style>
 </head>
 <body>
 
-    <header dir="ltr">
-        <div class="logo">
-            <img src="Screenshot_2026-07-18_220821-removebg-preview.png" alt="logo">
-        </div>
-        <div class="header-buttons">
-            <button class="small-btn" id="langToggleBtn" onclick="toggleLanguage()" dir="auto">🌐 عربي</button>
-            <button class="small-btn" id="logoutBtn" onclick="logout()" style="display: none;" data-i18n="signOut" dir="auto">Sign Out</button>
-        </div>
-    </header>
-
-    <div id="loginSection">
-        <div class="form-container">
-            <h1 data-i18n="signInTitle">Sign In</h1>
-            <form id="loginForm">
-                <input type="email" id="loginEmail" data-i18n-ph="emailPh" placeholder="Email" required><br>
-                <input type="password" id="loginPassword" data-i18n-ph="passPh" placeholder="Password" required><br>
-                <button type="submit" class="authBtn" data-i18n="loginBtn">Login</button>
-            </form>
-            <p id="loginErrorMsg" class="error-text" style="display: none;" data-i18n="invalidCreds">Invalid credentials!</p>
-            <p class="toggle-text"><span onclick="showOwnerPanel()" data-i18n="ownerPortal">Owner Portal</span></p>
-        </div>
+    <!-- 1. LOGIN PAGE -->
+    <div id="view-login">
+        <h2>Enter Email to Verify</h2>
+        <input type="email" id="email-input" placeholder="email@example.com">
+        <button onclick="login()">Verify & Login</button>
     </div>
 
-    <div id="ownerSection" style="display: none;">
-        <h1 data-i18n="ownerDash">Owner Dashboard</h1>
-        
-        <div id="adminAuthBox">
-            <input type="password" id="adminKeyInput" data-i18n-ph="secretKeyPh" placeholder="Enter Owner Secret Key"><br>
-            <button class="authBtn" onclick="verifyAdminKey()" data-i18n="accessAdminBtn">Access Admin Panel</button>
-            <p id="adminAuthError" class="error-text" style="display: none;"></p>
-        </div>
-
-        <div id="adminControls" style="display: none;">
-            <div class="forms-wrapper">
-                <div class="form-card">
-                    <h2 data-i18n="addClientTitle">Add New Client Account</h2>
-                    <form id="adminAddForm">
-                        <input type="email" id="newEmail" data-i18n-ph="clientEmailPh" placeholder="Client Email" required><br>
-                        <input type="password" id="newPassword" data-i18n-ph="clientPassPh" placeholder="Client Password" required><br>
-                        <input type="text" id="newTitle" data-i18n-ph="devNamePh" placeholder="Device Name" required><br>
-                        <button type="submit" class="authBtn" data-i18n="addClientBtn">Add Client</button>
-                    </form>
-                    <p id="adminAddMsg" style="display: none; margin-top: 10px;"></p>
-                </div>
-            </div>
-            <h2 style="margin-top: 40px;" data-i18n="existingClients">Existing Clients</h2>
-            <div id="userListContainer"></div>
-        </div>
-
-        <p class="toggle-text"><span onclick="showLoginSection()" data-i18n="backToLogin">← Back to Sign In</span></p>
+    <!-- 2. SENDERS PAGE -->
+    <div id="view-senders" class="hidden">
+        <h2>My Senders</h2>
+        <div id="senders-container"></div>
+        <button onclick="startScanner('sender')">Scan QR to Add Sender</button>
     </div>
 
-    <div id="controlSection" style="display: none;">
-        <button class="scan-plus-btn" onclick="toggleQrScanner()" title="Pair Device">+</button>
-        <h1 id="deviceHeader">Appliance Control</h1>
-        <div id="qrReader" style="width: 100%; max-width: 320px; display: none; margin: 15px auto;"></div>
-        <div id="clientButtonsContainer"></div>
+    <!-- 3. RECEIVERS PAGE -->
+    <div id="view-receivers" class="hidden">
+        <button onclick="switchView('view-senders')">⬅ Back to Senders</button>
+        <h2 id="current-sender-title"></h2>
+        <div id="receivers-container"></div>
+        <button onclick="startScanner('receiver')">Scan QR to Add Receiver</button>
+    </div>
+
+    <!-- QR SCANNER OVERLAY -->
+    <div id="view-scanner" class="hidden">
+        <div id="reader"></div>
+        <button onclick="stopScanner()">Cancel Scan</button>
     </div>
 
     <script>
-        const translations = {
-            en: {
-                langToggle: "🌐 عربي",
-                signInTitle: "Sign In",
-                emailPh: "Email",
-                passPh: "Password",
-                loginBtn: "Login",
-                invalidCreds: "Invalid credentials!",
-                ownerPortal: "Owner Portal",
-                ownerDash: "Owner Dashboard",
-                secretKeyPh: "Enter Owner Secret Key",
-                accessAdminBtn: "Access Admin Panel",
-                addClientTitle: "Add New Client Account",
-                clientEmailPh: "Client Email",
-                clientPassPh: "Client Password",
-                devNamePh: "Device Name (e.g. Living Room ESP)",
-                addClientBtn: "Add Client",
-                existingClients: "Existing Clients",
-                backToLogin: "← Back to Sign In",
-                signOut: "Sign Out",
-                stateOn: "ON",
-                stateOff: "OFF",
-                deleteDev: "✕ Delete Device",
-                noDevices: "No control buttons assigned. Click + to pair.",
-                tblEmail: "Email",
-                tblName: "Device Name",
-                tblAction: "Action",
-                delUser: "Delete User",
-                alertDelConf: "Are you sure you want to remove this device?",
-                alertDelESP: "Device deleted via ESP32 hardware button."
-            },
-            ar: {
-                langToggle: "🌐 English",
-                signInTitle: "تسجيل الدخول",
-                emailPh: "البريد الإلكتروني",
-                passPh: "كلمة المرور",
-                loginBtn: "دخول",
-                invalidCreds: "بيانات الاعتماد غير صالحة!",
-                ownerPortal: "بوابة المالك",
-                ownerDash: "لوحة تحكم المالك",
-                secretKeyPh: "أدخل المفتاح السري",
-                accessAdminBtn: "الدخول للوحة الإدارة",
-                addClientTitle: "إضافة حساب عميل جديد",
-                clientEmailPh: "بريد العميل",
-                clientPassPh: "كلمة مرور العميل",
-                devNamePh: "اسم الجهاز (مثال: صالة الجلوس)",
-                addClientBtn: "إضافة عميل",
-                existingClients: "العملاء الحاليين",
-                backToLogin: "العودة لتسجيل الدخول →",
-                signOut: "تسجيل الخروج",
-                stateOn: "تشغيل",
-                stateOff: "إيقاف",
-                deleteDev: "✕ حذف الجهاز",
-                noDevices: "لا توجد أزرار تحكم. اضغط على + للإقران.",
-                tblEmail: "البريد",
-                tblName: "اسم الجهاز",
-                tblAction: "إجراء",
-                delUser: "حذف المستخدم",
-                alertDelConf: "هل أنت متأكد أنك تريد حذف هذا الجهاز؟",
-                alertDelESP: "تم حذف الجهاز عبر زر ESP32."
-            }
-        };
+        let currentUser = null;
+        let currentSender = null;
+        let scanMode = ''; 
+        let html5QrcodeScanner = null;
 
-        let currentLang = localStorage.getItem("preferredLang") || "en";
+        // --- MQTT Setup ---
+        // Replace with your actual broker address and port (e.g., wss://broker.emqx.io:8084/mqtt)
+        const mqttClient = new Paho.MQTT.Client("broker.emqx.io", 8084, "client_" + Math.random().toString(16).substr(2, 8));
+        mqttClient.connect({ useSSL: true, onSuccess: () => console.log("MQTT Connected") });
 
-        function applyLanguage() {
-            document.documentElement.lang = currentLang;
-            document.documentElement.dir = currentLang === "ar" ? "rtl" : "ltr";
-            document.getElementById("langToggleBtn").innerText = translations[currentLang].langToggle;
+        function switchView(viewId) {
+            document.querySelectorAll('body > div').forEach(div => div.classList.add('hidden'));
+            document.getElementById(viewId).classList.remove('hidden');
+        }
 
-            document.querySelectorAll("[data-i18n]").forEach(el => {
-                const key = el.getAttribute("data-i18n");
-                if (translations[currentLang][key]) el.innerText = translations[currentLang][key];
+        async function login() {
+            const email = document.getElementById('email-input').value;
+            if (!email) return alert("Enter email");
+
+            const res = await fetch('/api/login', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ email })
             });
-
-            document.querySelectorAll("[data-i18n-ph]").forEach(el => {
-                const key = el.getAttribute("data-i18n-ph");
-                if (translations[currentLang][key]) el.placeholder = translations[currentLang][key];
-            });
-
-            if (document.getElementById("controlSection").style.display !== "none") renderClientButtons();
-            if (document.getElementById("adminControls").style.display !== "none") verifyAdminKey(); 
-        }
-
-        function toggleLanguage() {
-            currentLang = currentLang === "en" ? "ar" : "en";
-            localStorage.setItem("preferredLang", currentLang);
-            applyLanguage();
-        }
-
-        const broker = "broker.hivemq.com";
-        const port = 8884;
-        const API_URL = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") 
-            ? `http://${window.location.hostname}:3000/api` : `${window.location.origin}/api`;
-
-        let client = null;
-        let activeAccount = null;
-        let buttonStates = {};
-        let currentAdminKey = "";
-        let html5QrCodeScanner = null;
-        let holdTimer = null;
-        let isHoldTriggered = false;
-        let ignoreMouse = false;
-
-        const loginSection = document.getElementById("loginSection");
-        const ownerSection = document.getElementById("ownerSection");
-        const controlSection = document.getElementById("controlSection");
-        const logoutBtn = document.getElementById("logoutBtn");
-
-        window.addEventListener("DOMContentLoaded", () => {
-            applyLanguage(); 
-            const savedUserData = localStorage.getItem("activeEspUser");
-            if (savedUserData) {
-                activeAccount = JSON.parse(savedUserData);
-                openDashboard();
+            const data = await res.json();
+            if (data.success) {
+                currentUser = data.user;
+                renderSenders();
+                switchView('view-senders');
             }
-        });
-
-        function showOwnerPanel() { loginSection.style.display = "none"; ownerSection.style.display = "flex"; }
-        function showLoginSection() { ownerSection.style.display = "none"; loginSection.style.display = "flex"; }
-
-        document.getElementById("loginForm").addEventListener("submit", async function(e) {
-            e.preventDefault();
-            const email = document.getElementById("loginEmail").value.trim().toLowerCase();
-            const password = document.getElementById("loginPassword").value;
-            const errorMsg = document.getElementById("loginErrorMsg");
-
-            try {
-                const res = await fetch(`${API_URL}/login`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    activeAccount = data.user;
-                    localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
-                    errorMsg.style.display = "none";
-                    openDashboard();
-                } else {
-                    errorMsg.innerText = data.message; errorMsg.style.display = "block";
-                }
-            } catch (err) {
-                errorMsg.innerText = "Cannot connect to server!"; errorMsg.style.display = "block";
-            }
-        });
-
-        async function verifyAdminKey() {
-            const keyInput = document.getElementById("adminKeyInput").value || currentAdminKey;
-            if(!keyInput) return;
-            const authError = document.getElementById("adminAuthError");
-
-            try {
-                const res = await fetch(`${API_URL}/admin/users`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminKey: keyInput })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    currentAdminKey = keyInput;
-                    authError.style.display = "none";
-                    document.getElementById("adminAuthBox").style.display = "none";
-                    document.getElementById("adminControls").style.display = "block";
-                    renderUserList(data.users);
-                } else {
-                    authError.innerText = data.message; authError.style.display = "block";
-                }
-            } catch (err) {}
         }
 
-        document.getElementById("adminAddForm").addEventListener("submit", async function(e) {
-            e.preventDefault();
-            const email = document.getElementById("newEmail").value.trim();
-            const password = document.getElementById("newPassword").value;
-            const title = document.getElementById("newTitle").value.trim();
-            const msgEl = document.getElementById("adminAddMsg");
-
-            try {
-                const res = await fetch(`${API_URL}/admin/add-user`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminKey: currentAdminKey, email, password, title })
-                });
-                const data = await res.json();
-                msgEl.innerText = data.message;
-                msgEl.style.color = data.success ? "#22c55e" : "#ef4444";
-                msgEl.style.display = "block";
-                if(data.success) { document.getElementById("adminAddForm").reset(); verifyAdminKey(); }
-            } catch (err) {}
-        });
-
-        function renderUserList(users) {
-            const container = document.getElementById("userListContainer");
-            if (!users || users.length === 0) {
-                container.innerHTML = `<p style='color: #888;'>No clients added yet.</p>`;
-                return;
-            }
-            let html = `<table class='admin-table'><tr>
-                <th>${translations[currentLang].tblEmail}</th>
-                <th>${translations[currentLang].tblName}</th>
-                <th>${translations[currentLang].tblAction}</th></tr>`;
-            users.forEach(u => {
-                html += `<tr><td><strong>${u.email}</strong></td><td>${u.title}</td>
-                    <td><button class='deleteBtn' onclick="deleteUser('${u.email}')">${translations[currentLang].delUser}</button></td></tr>`;
-            });
-            html += "</table>";
-            container.innerHTML = html;
-        }
-
-        async function deleteUser(email) {
-            if (!confirm(`Delete user: ${email}?`)) return;
-            try {
-                const res = await fetch(`${API_URL}/admin/delete-user`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminKey: currentAdminKey, targetEmail: email })
-                });
-                const data = await res.json();
-                if (data.success) verifyAdminKey(); else alert(data.message);
-            } catch (err) {}
-        }
-
-        function openDashboard() {
-            loginSection.style.display = "none"; ownerSection.style.display = "none";
-            controlSection.style.display = "flex"; logoutBtn.style.display = "block";
-            document.getElementById("deviceHeader").innerText = activeAccount.title;
-            renderClientButtons(); initMqttConnection();
-        }
-
-        function renderClientButtons() {
-            const container = document.getElementById("clientButtonsContainer");
-            container.innerHTML = "";
-            if (!activeAccount.buttons || activeAccount.buttons.length === 0) {
-                container.innerHTML = `<p style='color:#888;'>${translations[currentLang].noDevices}</p>`;
-                return;
-            }
-
-            activeAccount.buttons.forEach((b, index) => {
-                if (!(b.id in buttonStates)) buttonStates[b.id] = false;
-                const stateText = buttonStates[b.id] ? translations[currentLang].stateOn : translations[currentLang].stateOff;
-                
-                // Parse packed database string for names
-                let nameEn = b.nameEn;
-                let nameAr = b.nameAr;
-                let rawName = b.name || "Device";
-
-                if (!nameEn || !nameAr) {
-                    if (rawName.includes('|')) {
-                        const parts = rawName.split('|');
-                        nameEn = parts[0];
-                        nameAr = parts[1] || parts[0];
-                    } else {
-                        // Fallback if it's an old DB entry that doesn't have a |
-                        nameEn = rawName;
-                        nameAr = rawName; 
-                    }
-                }
-
-                const displayName = currentLang === 'ar' ? nameAr : nameEn;
-
-                container.innerHTML += `
-                    <div class="device-card">
-                        <h3>${displayName}</h3>
-                        <button id="btn_${b.id}" class="authBtn appliance-btn" 
-                                oncontextmenu="return false;"
-                                onmousedown="startHold('${b.id}', event)" onmouseup="endHold('${b.id}', '${b.pubTopic}', event)" 
-                                onmouseleave="cancelHold()" ontouchstart="startHold('${b.id}', event)" 
-                                ontouchend="endHold('${b.id}', '${b.pubTopic}', event)" ontouchcancel="cancelHold()">
-                                ${stateText}</button>
-                        <button id="delBtn_${b.id}" class="delete-device-btn" style="display: none;" 
-                                onclick="deleteDevice('${b.id}', ${index})">${translations[currentLang].deleteDev}</button>
-                    </div>
-                `;
+        // --- Senders Logic ---
+        function renderSenders() {
+            const container = document.getElementById('senders-container');
+            container.innerHTML = '';
+            currentUser.senders.forEach(sender => {
+                const sq = document.createElement('div');
+                sq.className = 'sender-square';
+                sq.innerText = sender.name;
+                sq.onclick = () => openSender(sender);
+                container.appendChild(sq);
             });
         }
 
-        function startHold(buttonId, e) {
-            if (e && e.type === 'touchstart') ignoreMouse = true;
-            if (e && e.type === 'mousedown' && ignoreMouse) return;
-            isHoldTriggered = false;
-            holdTimer = setTimeout(() => {
-                isHoldTriggered = true;
-                const delBtn = document.getElementById(`delBtn_${buttonId}`);
-                if (delBtn) delBtn.style.display = (delBtn.style.display === "none") ? "block" : "none";
-            }, 1000);
+        function openSender(sender) {
+            currentSender = sender;
+            document.getElementById('current-sender-title').innerText = sender.name + " - Receivers";
+            renderReceivers();
+            switchView('view-receivers');
         }
 
-        function endHold(buttonId, pubTopic, e) {
-            if (e && e.type === 'touchend' && e.cancelable) e.preventDefault(); 
-            if (e && e.type === 'mouseup' && ignoreMouse) { ignoreMouse = false; return; }
-            clearTimeout(holdTimer);
-            if (!isHoldTriggered) toggleAppliance(buttonId, pubTopic);
-        }
-        function cancelHold() { clearTimeout(holdTimer); }
-
-        async function deleteDevice(buttonId, index, isFromESP32 = false) {
-            if (!isFromESP32 && !confirm(translations[currentLang].alertDelConf)) return;
-            try {
-                if (!isFromESP32 && client && client.isConnected()) {
-                    let delMsg = new Paho.Message(JSON.stringify({ index: index }));
-                    delMsg.destinationName = "esp32/setup/delete"; client.send(delMsg);
-                }
-                const res = await fetch(`${API_URL}/client/delete-button`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: activeAccount.email, buttonId: buttonId })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    activeAccount.buttons = activeAccount.buttons.filter(b => b.id !== buttonId);
-                    localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
-                    renderClientButtons();
-                    if (isFromESP32) alert(translations[currentLang].alertDelESP);
-                }
-            } catch (err) {}
+        // --- Receivers Logic ---
+        function renderReceivers() {
+            const container = document.getElementById('receivers-container');
+            container.innerHTML = '';
+            currentSender.receivers.forEach(receiver => {
+                const btn = document.createElement('button');
+                btn.className = 'receiver-btn';
+                btn.innerText = receiver.name;
+                btn.onclick = () => activateReceiver(receiver);
+                container.appendChild(btn);
+            });
         }
 
-        function initMqttConnection() {
-            const uniqueClientId = "web_client_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
-            client = new Paho.Client(broker, Number(port), "/mqtt", uniqueClientId);
+        function activateReceiver(receiver) {
+            // Sends command to Sender's specific subTopic
+            if (!mqttClient.isConnected()) return alert("MQTT not connected yet");
             
-            client.onMessageArrived = (msg) => {
-                if (msg.destinationName === "esp32/setup/delete") {
-                    try {
-                        const payload = JSON.parse(msg.payloadString);
-                        if (payload.source === "esp32" && payload.index >= 0) {
-                            if (activeAccount.buttons && activeAccount.buttons[payload.index]) {
-                                deleteDevice(activeAccount.buttons[payload.index].id, payload.index, true); 
-                            }
-                        }
-                    } catch(e) {}
-                    return; 
-                }
-                if (activeAccount.buttons) {
-                    const matchedBtn = activeAccount.buttons.find(b => b.subTopic === msg.destinationName);
-                    if (matchedBtn) {
-                        const state = (msg.payloadString === "1");
-                        buttonStates[matchedBtn.id] = state;
-                        const btnEl = document.getElementById(`btn_${matchedBtn.id}`);
-                        if (btnEl) btnEl.innerText = state ? translations[currentLang].stateOn : translations[currentLang].stateOff;
-                    }
-                }
-            };
-            client.connect({
-                useSSL: true, cleanSession: true, timeout: 10,
-                onSuccess: () => {
-                    client.subscribe("esp32/setup/delete");
-                    if (activeAccount.buttons) {
-                        activeAccount.buttons.forEach(b => {
-                            if (b.subTopic) client.subscribe(b.subTopic);
-                        });
-                    }
-                }
+            const payload = JSON.stringify({
+                command: "toggle_and_add",
+                mac: receiver.mac,
+                name: receiver.name
             });
+
+            const message = new Paho.MQTT.Message(payload);
+            message.destinationName = currentSender.subTopic;
+            mqttClient.send(message);
+            console.log("Command sent to sender:", currentSender.id, payload);
         }
 
-        function toggleAppliance(buttonId, pubTopic) {
-            if (!client || !client.isConnected()) return;
-            let nextState = buttonStates[buttonId] ? "0" : "1";
-            let message = new Paho.Message(nextState);
-            message.destinationName = pubTopic;
-            client.send(message);
-            buttonStates[buttonId] = (nextState === "1");
-            const btnEl = document.getElementById(`btn_${buttonId}`);
-            if (btnEl) btnEl.innerText = buttonStates[buttonId] ? translations[currentLang].stateOn : translations[currentLang].stateOff;
+        // --- QR Scanner Logic ---
+        function startScanner(mode) {
+            scanMode = mode;
+            switchView('view-scanner');
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            html5QrcodeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: {width: 250, height: 250} }, onScanSuccess);
         }
 
-        function logout() {
-            localStorage.removeItem("activeEspUser");
-            if (client && client.isConnected()) client.disconnect();
-            activeAccount = null;
-            controlSection.style.display = "none"; logoutBtn.style.display = "none";
-            loginSection.style.display = "flex"; document.getElementById("loginForm").reset();
+        function stopScanner() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop().then(() => {
+                    switchView(scanMode === 'sender' ? 'view-senders' : 'view-receivers');
+                });
+            }
         }
 
-        function toggleQrScanner() {
-            const qrDiv = document.getElementById("qrReader");
-            if (qrDiv.style.display === "none") {
-                qrDiv.style.display = "block";
-                html5QrCodeScanner = new Html5Qrcode("qrReader");
-                html5QrCodeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onQrCodeScanned).catch(err => alert("Camera access error"));
-            } else { stopQrScanner(); }
-        }
-        function stopQrScanner() {
-            if (html5QrCodeScanner) html5QrCodeScanner.stop().then(() => { document.getElementById("qrReader").style.display = "none"; });
-        }
-        
-        async function onQrCodeScanned(decodedText) {
-            stopQrScanner();
+        async function onScanSuccess(decodedText) {
+            stopScanner();
             try {
                 const qrData = JSON.parse(decodedText);
-                if (qrData.pubTopic && qrData.subTopic) {
+                
+                if (scanMode === 'sender') {
+                    const name = prompt("Name this Sender device:");
+                    if (!name) return switchView('view-senders');
                     
-                    const nEn = qrData.nameEn || "Room Light";
-                    const nAr = qrData.nameAr || "إضاءة الغرفة";
-                    
-                    // Pack both names into one string using | as a separator for backend storage
-                    const combinedName = nEn + "|" + nAr; 
-
-                    const res = await fetch(`${API_URL}/admin/add-button`, {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            targetEmail: activeAccount.email, 
-                            nameEn: nEn, 
-                            nameAr: nAr,
-                            buttonName: combinedName,
-                            pubTopic: qrData.pubTopic, 
-                            subTopic: qrData.subTopic, 
-                            macAddr: qrData.mac || "FF:FF:FF:FF:FF:FF" 
-                        })
+                    const res = await fetch('/api/add-sender', {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ email: currentUser.email, id: qrData.id, subTopic: qrData.subTopic, name })
                     });
-                    
                     const data = await res.json();
-                    if (data.success) {
-                        if (!activeAccount.buttons) activeAccount.buttons = [];
-                        
-                        const newBtn = data.button;
-                        // Ensure local rendering uses the correct names right away
-                        newBtn.nameEn = nEn;
-                        newBtn.nameAr = nAr;
+                    if(data.success) currentUser.senders.push(data.sender);
+                    renderSenders();
+                    switchView('view-senders');
+                } 
+                else if (scanMode === 'receiver') {
+                    const name = prompt("Name this Receiver:");
+                    if (!name) return switchView('view-receivers');
 
-                        activeAccount.buttons.push(newBtn);
-                        localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
-                        
-                        if (client && client.isConnected()) {
-                            client.subscribe(newBtn.subTopic);
-                            
-                            let configMsg = new Paho.Message(JSON.stringify({
-                                nameEn: nEn, 
-                                nameAr: nAr, 
-                                pubTopic: qrData.pubTopic, 
-                                subTopic: qrData.subTopic, 
-                                mac: qrData.mac
-                            }));
-                            configMsg.destinationName = "esp32/setup/config"; 
-                            client.send(configMsg);
-                        }
-                        renderClientButtons();
-                    }
+                    const res = await fetch('/api/add-receiver', {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ email: currentUser.email, senderId: currentSender.id, mac: qrData.mac, name })
+                    });
+                    const data = await res.json();
+                    if(data.success) currentSender.receivers.push(data.receiver);
+                    renderReceivers();
+                    switchView('view-receivers');
                 }
             } catch (e) {
-                console.error("Failed to parse QR or send data:", e);
+                alert("Invalid QR format. Ensure it is JSON.");
+                switchView(scanMode === 'sender' ? 'view-senders' : 'view-receivers');
             }
         }
     </script>
