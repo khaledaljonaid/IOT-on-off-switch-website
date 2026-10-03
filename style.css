@@ -17,14 +17,14 @@ header {
 /* Sections */
 #loginSection, #sendersSection, #receiversSection {
     flex: 1; display: flex; flex-direction: column;
-    align-items: center; padding: 20px; width: 100%;
+    align-items: center; padding: 20px; width: 100%; position: relative;
 }
 #loginSection { justify-content: flex-start; padding-top: 40px; }
-#sendersSection, #receiversSection { justify-content: flex-start; position: relative; padding-top: 30px; }
+#sendersSection, #receiversSection { justify-content: flex-start; }
 
 .form-container { width: 100%; max-width: 320px; }
-h1 { font-size: 1.8rem; margin-bottom: 20px; color: white; }
-h2 { font-size: 1.3rem; color: rgb(0, 162, 255); }
+h1 { font-size: 1.8rem; margin-bottom: 20px; }
+h2 { font-size: 1.3rem; }
 
 input {
     width: 100%; max-width: 300px; padding: 12px; margin: 8px 0;
@@ -52,8 +52,6 @@ input {
 
 .back-btn {
     position: absolute; top: 15px; inset-inline-start: 20px;
-    background: none; border: none; color: rgb(0, 162, 255);
-    font-size: 1rem; font-weight: bold; cursor: pointer;
 }
 
 .scan-plus-btn {
@@ -62,46 +60,56 @@ input {
     border: none; border-radius: 50%; font-size: 1.8rem; font-weight: bold;
     line-height: 1; display: flex; justify-content: center; align-items: center;
     cursor: pointer; box-shadow: 0px 2px 8px rgba(0, 162, 255, 0.4);
+    z-index: 10;
 }
 .scan-plus-btn:active { transform: scale(0.92); }
 
-/* Grids & Cards */
-.sender-grid, .receiver-grid {
+.error-text { color: #ef4444; font-size: 0.9rem; margin-top: 10px; }
+.toggle-text { margin-top: 25px; font-size: 0.9rem; color: #888; }
+.toggle-text span { color: rgb(0, 162, 255); cursor: pointer; text-decoration: underline; }
+
+.deleteBtn, .delete-device-btn { background-color: #ef4444; color: white; border: none; cursor: pointer; border-radius: 4px; }
+.deleteBtn { padding: 6px 12px; }
+.delete-device-btn { padding: 5px 10px; font-size: 0.75rem; margin-top: 8px; animation: fadeIn 0.2s ease-in-out; }
+.deleteBtn:hover, .delete-device-btn:hover { background-color: #dc2626; }
+
+.device-card { margin: 15px auto; max-width: 300px; width: 100%; display: flex; flex-direction: column; align-items: center; }
+
+/* SENDER SQUARES GRID */
+.squares-wrapper {
     display: flex; flex-wrap: wrap; justify-content: center;
-    gap: 20px; margin-top: 20px; width: 100%; max-width: 600px;
+    gap: 20px; margin-top: 25px; width: 100%; max-width: 600px;
 }
 
 .sender-square {
-    width: 130px; height: 130px; background-color: #111;
-    border: 2px solid rgb(0, 162, 255); border-radius: 12px;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    cursor: pointer; padding: 10px; transition: all 0.2s ease;
-    box-shadow: 0 4px 12px rgba(0, 162, 255, 0.15); position: relative;
+    width: 140px; height: 140px; background-color: #111;
+    border: 1px solid #333; border-radius: 10px;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    padding: 10px; cursor: pointer; transition: transform 0.2s, border-color 0.2s;
+    box-shadow: 0px 4px 10px rgba(0,0,0,0.5);
 }
 .sender-square:hover {
-    background-color: #1a1a1a; transform: translateY(-3px);
-    box-shadow: 0 6px 16px rgba(0, 162, 255, 0.3);
+    border-color: rgb(0, 162, 255); transform: translateY(-3px);
 }
-.sender-square .icon { font-size: 2rem; margin-bottom: 6px; color: rgb(0, 162, 255); }
-.sender-square .title { font-size: 0.95rem; font-weight: bold; color: white; word-break: break-word; }
-
-.device-card { margin: 10px auto; width: 100%; max-width: 300px; display: flex; flex-direction: column; align-items: center; }
-
-.delete-device-btn {
-    background-color: #ef4444; color: white; border: none; cursor: pointer;
-    border-radius: 4px; padding: 5px 10px; font-size: 0.75rem; margin-top: 8px;
+.sender-title {
+    font-weight: bold; font-size: 1rem; color: #fff; margin-bottom: 5px;
+    word-break: break-word; max-width: 120px;
 }
-.del-sender-btn { position: absolute; bottom: 8px; font-size: 0.65rem; padding: 3px 6px; }
+.sender-id {
+    font-size: 0.75rem; color: rgb(0, 162, 255); margin-bottom: 8px;
+}
 
-/* Modals */
+/* QR BOX & MODALS */
+.qr-box { width: 100%; max-width: 320px; margin: 15px auto; }
+
 .modal-overlay {
-    position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.85);
-    display: flex; justify-content: center; align-items: center; z-index: 1000;
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background-color: rgba(0, 0, 0, 0.85); display: flex;
+    justify-content: center; align-items: center; z-index: 100;
 }
-.modal-card {
-    background-color: #111; border: 1px solid #333; border-radius: 12px;
-    padding: 25px; width: 90%; max-width: 340px; text-align: center;
+.modal-content {
+    background-color: #111; padding: 25px; border-radius: 12px;
+    border: 1px solid #333; box-shadow: 0px 5px 20px rgba(0, 162, 255, 0.2);
 }
-#qrReader { width: 100%; margin: 15px 0; border-radius: 8px; overflow: hidden; }
 
-.error-text { color: #ef4444; font-size: 0.9rem; margin-top: 10px; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
