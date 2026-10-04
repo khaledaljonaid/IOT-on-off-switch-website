@@ -1,7 +1,14 @@
 {
+  "name": "esp32_control",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
     "nodemailer": "^6.9.13"
   }
 }
