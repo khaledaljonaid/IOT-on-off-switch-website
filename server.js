@@ -48,7 +48,7 @@ function saveUsers(users) {
 }
 
 // 1. CLIENT LOGIN / AUTO-REGISTER
-const API_BASE_URL = ''; 
+const API_BASE_URL = 'https://iot-on-off-switch-website.onrender.com'; 
 
 // STEP 1: Request the code to be sent to the email
 async function sendVerificationCode() {
