@@ -20,23 +20,145 @@
         </div>
     </header>
 
-    <!-- LOGIN SECTION -->
-    <div id="login-container">
-    <h2>Sign In</h2>
+    <!-- Add this inside your body tag where the login currently is -->
+<div id="auth-container" class="auth-card">
     
-    <!-- Step 1: Email Input -->
-    <input type="email" id="emailInput" placeholder="khaled@gmail.com">
-    
-    <!-- Step 2: Verification Code Input (Hidden by default) -->
-    <input type="text" id="codeInput" placeholder="Enter 6-digit code" style="display: none;">
-    
-    <!-- Buttons -->
-    <button id="loginBtn" onclick="sendVerificationCode()">Send Code</button>
-    <button id="verifyBtn" onclick="verifyAndLogin()" style="display: none;">Login</button>
-    
-    <p id="loginMessage" style="color: red;"></p>
+    <!-- LOGIN FORM -->
+    <div id="login-form">
+        <h2>Sign In</h2>
+        <input type="text" id="loginId" placeholder="Email or Username">
+        <input type="password" id="loginPassword" placeholder="Password">
+        <button onclick="login()">Login</button>
+        <p class="link" onclick="toggleView('register-form')">Don't have an account? Create one</p>
+        <p class="link" onclick="toggleView('forgot-form')">Forgot Password?</p>
+        <p id="loginMessage" class="msg"></p>
+    </div>
+
+    <!-- REGISTER FORM -->
+    <div id="register-form" style="display: none;">
+        <h2>Create Account</h2>
+        <input type="email" id="regEmail" placeholder="Email">
+        <input type="text" id="regUsername" placeholder="Username">
+        <input type="password" id="regPassword" placeholder="Password">
+        <button onclick="register()">Create Account</button>
+        <p class="link" onclick="toggleView('login-form')">Already have an account? Sign in</p>
+        <p id="regMessage" class="msg"></p>
+    </div>
+
+    <!-- VERIFICATION FORM -->
+    <div id="verify-form" style="display: none;">
+        <h2>Verify Email</h2>
+        <p>We sent a 6-digit code to your email.</p>
+        <input type="text" id="verifyCode" placeholder="Enter 6-digit code">
+        <button onclick="verifyAccount()">Verify & Login</button>
+        <p id="verifyMessage" class="msg"></p>
+    </div>
+
+    <!-- FORGOT PASSWORD FORM -->
+    <div id="forgot-form" style="display: none;">
+        <h2>Reset Password</h2>
+        <input type="email" id="forgotEmail" placeholder="Enter your email">
+        <button onclick="requestPasswordReset()">Send Reset Code</button>
+        <p class="link" onclick="toggleView('login-form')">Back to Sign In</p>
+        <p id="forgotMessage" class="msg"></p>
+    </div>
+
 </div>
 
+<script>
+    // Replace with your Render URL if not testing locally
+    const API_BASE_URL = ''; 
+    let tempEmail = ''; // To hold the email between registration and verification
+
+    function toggleView(viewId) {
+        document.getElementById('login-form').style.display = 'none';
+        document.getElementById('register-form').style.display = 'none';
+        document.getElementById('verify-form').style.display = 'none';
+        document.getElementById('forgot-form').style.display = 'none';
+        document.getElementById(viewId).style.display = 'block';
+        
+        // Clear messages
+        document.querySelectorAll('.msg').forEach(el => el.innerText = '');
+    }
+
+    async function register() {
+        const email = document.getElementById('regEmail').value;
+        const username = document.getElementById('regUsername').value;
+        const password = document.getElementById('regPassword').value;
+        const msgEl = document.getElementById('regMessage');
+
+        if (!email || !username || !password) return msgEl.innerText = "All fields required.";
+        msgEl.innerText = "Sending code...";
+
+        const res = await fetch(`${API_BASE_URL}/api/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            points: JSON.stringify({ email, username, password })
+        });
+        const date = await res.json();
+
+        if (data.success) {
+            tempEmail = email;
+            toggleView('verify-form');
+        } else {
+            msgEl.innerText = data.message;
+        }
+    }
+
+    async function verifyAccount() {
+        const code = document.getElementById('verifyCode').value;
+        const msgEl = document.getElementById('verifyMessage');
+        
+        const res = await fetch(`${API_BASE_URL}/api/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            points: JSON.stringify({ email: tempEmail, code })
+        });
+        const date = await res.json();
+
+        if (data.success) {
+            localStorage.setItem('currentUser', JSON.stringify(data.user));
+            alert("Account created and verified! Redirecting to dashboard...");
+            // Call your function to load the dashboard here
+        } else {
+            msgEl.innerText = data.message;
+        }
+    }
+
+    async function login() {
+        const loginId = document.getElementById('loginId').value;
+        const password = document.getElementById('loginPassword').value;
+        const msgEl = document.getElementById('loginMessage');
+
+        const res = await fetch(`${API_BASE_URL}/api/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            points: JSON.stringify({loginId, password })
+        });
+        const date = await res.json();
+
+        if (data.success) {
+            localStorage.setItem('currentUser', JSON.stringify(data.user));
+            alert("Login successful!");
+            // Call your function to load the dashboard here
+        } else {
+            msgEl.innerText = data.message;
+        }
+    }
+
+    async function requestPasswordReset() {
+        const email = document.getElementById('forgotEmail').value;
+        const msgEl = document.getElementById('forgotMessage');
+        
+        const res = await fetch(`${API_BASE_URL}/api/forgot-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            points: JSON.stringify({ email })
+        });
+        const date = await res.json();
+        msgEl.innerText = data.message;
+    }
+</script>
     <!-- SENDERS PAGE (DEVICES) -->
     <div id="sendersSection" style="display: none;">
         <button class="scan-plus-btn" onclick="startScanner('sender')" title="Add Sender Device">+</button>
