@@ -112,4 +112,55 @@ input {
     border: 1px solid #333; box-shadow: 0px 5px 20px rgba(0, 162, 255, 0.2);
 }
 
+.auth-card {
+    background: #111;
+    border: 1px solid #333;
+    padding: 30px;
+    border-radius: 10px;
+    width: 100%;
+    max-width: 400px;
+    margin: 50px auto;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+
+.auth-card input {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 5px;
+    border: 1px solid #444;
+    background: #222;
+    color: white;
+}
+
+.auth-card button {
+    width: 100%;
+    padding: 10px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.auth-card button:hover {
+    background: #0056b3;
+}
+
+.link {
+    color: #007bff;
+    font-size: 0.9em;
+    cursor: pointer;
+    margin-top: 15px;
+    text-decoration: underline;
+}
+
+.msg {
+    margin-top: 15px;
+    font-size: 0.9em;
+    color: #ff4444;
+}
+
 @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
