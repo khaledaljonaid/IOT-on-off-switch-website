@@ -48,29 +48,94 @@ function saveUsers(users) {
 }
 
 // 1. CLIENT LOGIN / AUTO-REGISTER
-app.post('/api/login', (req, res) => {
-    const { email, password } = req.body;
-    if (!email) return res.status(400).json({ success: false, message: "Email is required." });
+const API_BASE_URL = ''; 
 
-    const users = loadUsers();
-    const normalizedEmail = email.toLowerCase().trim();
-    let user = users.find(u => u.email.toLowerCase() === normalizedEmail);
-
-    if (user) {
-        if (password && user.password && user.password !== password) {
-            return res.status(401).json({ success: false, message: "Invalid credentials." });
-        }
-    } else {
-        user = { email: normalizedEmail, password: password || "", senders: [] };
-        users.push(user);
-        saveUsers(users);
+// STEP 1: Request the code to be sent to the email
+async function sendVerificationCode() {
+    const email = document.getElementById('emailInput').value;
+    const messageEl = document.getElementById('loginMessage');
+    
+    if (!email) {
+        messageEl.innerText = "Please enter your email.";
+        messageEl.style.color = "red";
+        return;
     }
 
-    return res.json({
-        success: true,
-        user: { email: user.email, senders: user.senders || [] }
-    });
-});
+    messageEl.innerText = "Sending code...";
+    messageEl.style.color = "white";
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email })
+        });
+        
+        const data = await response.json();
+
+        if (data.success && data.requireVerification) {
+            // Hide the 'Send Code' button and show the Code input field
+            document.getElementById('loginBtn').style.display = 'none';
+            document.getElementById('codeInput').style.display = 'block';
+            document.getElementById('verifyBtn').style.display = 'block';
+            
+            messageEl.innerText = "Check your email for the 6-digit code.";
+            messageEl.style.color = "#00ff00"; // Green success text
+        } else {
+            messageEl.innerText = data.message || "Failed to send code.";
+            messageEl.style.color = "red";
+        }
+    } catch (error) {
+        console.error("Error:", error);
+        messageEl.innerText = "Cannot connect to server!";
+        messageEl.style.color = "red";
+    }
+}
+
+// STEP 2: Verify the code and log the user in
+async function verifyAndLogin() {
+    const email = document.getElementById('emailInput').value;
+    const code = document.getElementById('codeInput').value;
+    const messageEl = document.getElementById('loginMessage');
+
+    if (!code) {
+        messageEl.innerText = "Please enter the verification code.";
+        messageEl.style.color = "red";
+        return;
+    }
+
+    messageEl.innerText = "Verifying...";
+    messageEl.style.color = "white";
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, code: code })
+        });
+        
+        const data = await response.json();
+
+        if (data.success) {
+            messageEl.innerText = "Login successful!";
+            messageEl.style.color = "#00ff00";
+            
+            // Save the user data locally so the dashboard can use it
+            localStorage.setItem('currentUser', JSON.stringify(data.user));
+            
+            // Assuming you have a function to hide the login screen and show the dashboard:
+            // loadDashboard(); 
+            
+        } else {
+            messageEl.innerText = data.message || "Invalid code.";
+            messageEl.style.color = "red";
+        }
+    } catch (error) {
+        console.error("Error:", error);
+        messageEl.innerText = "Cannot connect to server!";
+        messageEl.style.color = "red";
+    }
+}
 
 // 2. ADD SENDER DEVICE
 app.post('/api/add-sender', (req, res) => {
