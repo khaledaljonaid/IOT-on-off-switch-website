@@ -48,94 +48,103 @@ function saveUsers(users) {
 }
 
 // 1. CLIENT LOGIN / AUTO-REGISTER
-const API_BASE_URL = 'https://iot-on-off-switch-website.onrender.com'; 
-
-// STEP 1: Request the code to be sent to the email
-async function sendVerificationCode() {
-    const email = document.getElementById('emailInput').value;
-    const messageEl = document.getElementById('loginMessage');
+//1ST REGISTER NEW ACCOUNT
+app.post(‘/api/register’, async (req, res) => {
+    const { email, username, password } = req.body;
+    let users = loadUsers();
+    const normalizedEmail = email.toLowerCase().trim();
     
-    if (!email) {
-        messageEl.innerText = "Please enter your email.";
-        messageEl.style.color = "red";
-        return;
+    // Check if user already exists
+    if (users.find(u => u.email === normalizedEmail || u.username === username)) {
+        return res.status(400).json({ success: false, message: "Email or Username already exists." });
     }
 
-    messageEl.innerText = "Sending code...";
-    messageEl.style.color = "white";
+    const code = generateCode();
+    
+    // Save user as unverified
+    const newUser = { 
+        email: normalizedEmail, 
+        username: username,
+        password: password, 
+        isVerified: false,
+        verificationCode: code,
+        senders: [] 
+    };
+    users.push(newUser);
+    saveUsers(users);
 
     try {
-        const response = await fetch(`${API_BASE_URL}/api/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: email })
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: normalizedEmail,
+            subject: 'Verify your KAD Account',
+            text: `Your verification code is: ${code}`
         });
-        
-        const data = await response.json();
-
-        if (data.success && data.requireVerification) {
-            // Hide the 'Send Code' button and show the Code input field
-            document.getElementById('loginBtn').style.display = 'none';
-            document.getElementById('codeInput').style.display = 'block';
-            document.getElementById('verifyBtn').style.display = 'block';
-            
-            messageEl.innerText = "Check your email for the 6-digit code.";
-            messageEl.style.color = "#00ff00"; // Green success text
-        } else {
-            messageEl.innerText = data.message || "Failed to send code.";
-            messageEl.style.color = "red";
-        }
-    } catch (error) {
-        console.error("Error:", error);
-        messageEl.innerText = "Cannot connect to server!";
-        messageEl.style.color = "red";
+        res.json({ success: true, message: "Verification code sent." });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Failed to send email." });
     }
-}
+});
 
-// STEP 2: Verify the code and log the user in
-async function verifyAndLogin() {
-    const email = document.getElementById('emailInput').value;
-    const code = document.getElementById('codeInput').value;
-    const messageEl = document.getElementById('loginMessage');
+// 2. VERIFY ACCOUNT
+app.post('/api/verify', (req, res) => {
+    const { email, code } = req.body;
+    let users = loadUsers();
+    let user = users.find(u => u.email === email.toLowerCase().trim());
 
-    if (!code) {
-        messageEl.innerText = "Please enter the verification code.";
-        messageEl.style.color = "red";
-        return;
+    if (!user || user.verificationCode!== code) {
+        return res.status(400).json({ success: false, message: "Invalid code." });
     }
 
-    messageEl.innerText = "Verifying...";
-    messageEl.style.color = "white";
+    user.isVerified = true;
+    user.verificationCode = null; // Clear code
+    saveUsers(users);
+
+    res.json({ success: true, user: { email: user.email, username: user.username, senders: user.senders } });
+});
+
+// 3. LOGIN (Supports Email OR Username)
+app.post('/api/login', (req, res) => {
+    const { loginId, password } = req.body; // loginId can be email or username
+    const users = loadUsers();
+    const normalizedId = loginId.toLowerCase().trim();
+
+    const user = users.find(u => 
+        u.email === normalizedId || 
+        (u.username && u.username.toLowerCase() === normalizedId)
+    );
+
+    if (!user) return res.status(404).json({ success: false, message: "User not found." });
+    if (!user.isVerified) return res.status(403).json({ success: false, message: "Account not verified." });
+    if (user.password!== password) return res.status(401).json({ success: false, message: "Incorrect password." });
+
+    res.json({ success: true, user: { email: user.email, username: user.username, senders: user.senders } });
+});
+
+// 4. FORGOT PASSWORD
+app.post('/api/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    let users = loadUsers();
+    let user = users.find(u => u.email === email.toLowerCase().trim());
+
+    if (!user) return res.status(404).json({ success: false, message: "Email not found." });
+
+    const code = generateCode();
+    user.resetCode = code; // Create a temporary password/code
+    saveUsers(users);
 
     try {
-        const response = await fetch(`${API_BASE_URL}/api/verify`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: email, code: code })
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: user.email,
+            subject: 'Password Reset',
+            text: `Your temporary login code to reset your password is: ${code}`
         });
-        
-        const data = await response.json();
-
-        if (data.success) {
-            messageEl.innerText = "Login successful!";
-            messageEl.style.color = "#00ff00";
-            
-            // Save the user data locally so the dashboard can use it
-            localStorage.setItem('currentUser', JSON.stringify(data.user));
-            
-            // Assuming you have a function to hide the login screen and show the dashboard:
-            // loadDashboard(); 
-            
-        } else {
-            messageEl.innerText = data.message || "Invalid code.";
-            messageEl.style.color = "red";
-        }
-    } catch (error) {
-        console.error("Error:", error);
-        messageEl.innerText = "Cannot connect to server!";
-        messageEl.style.color = "red";
+        res.json({ success: true, message: "Reset instructions sent to email." });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Failed to send email." });
     }
-}
+});
 
 // 2. ADD SENDER DEVICE
 app.post('/api/add-sender', (req, res) => {
