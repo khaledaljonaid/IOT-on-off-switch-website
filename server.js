@@ -49,7 +49,7 @@ function saveUsers(users) {
 
 // 1. CLIENT LOGIN / AUTO-REGISTER
 //1ST REGISTER NEW ACCOUNT
-app.post(‘/api/register’, async (req, res) => {
+app.post('/api/register', async (req, res) => {
     const { email, username, password } = req.body;
     let users = loadUsers();
     const normalizedEmail = email.toLowerCase().trim();
