@@ -19,7 +19,18 @@ function loadUsers() {
     }
     try {
         const data = fs.readFileSync(DATA_FILE, 'utf8');
-        return JSON.parse(data || '[]');
+        let parsedData = JSON.parse(data || '[]');
+        
+        // Fix for old { "users": [] } format to prevent .find() crash
+        if (parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData)) {
+            if (Array.isArray(parsedData.users)) {
+                parsedData = parsedData.users;
+            } else {
+                parsedData = []; 
+            }
+        }
+        
+        return Array.isArray(parsedData) ? parsedData : [];
     } catch (err) {
         console.error("Error reading users.json:", err);
         return [];
