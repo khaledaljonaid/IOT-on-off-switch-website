@@ -21,17 +21,21 @@
     </header>
 
     <!-- LOGIN SECTION -->
-    <div id="loginSection">
-        <div class="form-container">
-            <h1 data-i18n="signInTitle">Sign In</h1>
-            <form id="loginForm">
-                <input type="email" id="loginEmail" data-i18n-ph="emailPh" placeholder="Email" required><br>
-                <input type="password" id="loginPassword" data-i18n-ph="passPh" placeholder="Password" required><br>
-                <button type="submit" class="authBtn" data-i18n="loginBtn">Login</button>
-            </form>
-            <p id="loginErrorMsg" class="error-text" style="display: none;" data-i18n="invalidCreds">Invalid credentials!</p>
-        </div>
-    </div>
+    <div id="login-container">
+    <h2>Sign In</h2>
+    
+    <!-- Step 1: Email Input -->
+    <input type="email" id="emailInput" placeholder="khaled@gmail.com">
+    
+    <!-- Step 2: Verification Code Input (Hidden by default) -->
+    <input type="text" id="codeInput" placeholder="Enter 6-digit code" style="display: none;">
+    
+    <!-- Buttons -->
+    <button id="loginBtn" onclick="sendVerificationCode()">Send Code</button>
+    <button id="verifyBtn" onclick="verifyAndLogin()" style="display: none;">Login</button>
+    
+    <p id="loginMessage" style="color: red;"></p>
+</div>
 
     <!-- SENDERS PAGE (DEVICES) -->
     <div id="sendersSection" style="display: none;">
