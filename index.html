@@ -20,8 +20,7 @@
         </div>
     </header>
 
-    <!-- Add this inside your body tag where the login currently is -->
-<div id="auth-container" class="auth-card">
+   <div id="auth-container" class="auth-card">
     
     <!-- LOGIN FORM -->
     <div id="login-form">
@@ -30,7 +29,6 @@
         <input type="password" id="loginPassword" placeholder="Password">
         <button onclick="login()">Login</button>
         <p class="link" onclick="toggleView('register-form')">Don't have an account? Create one</p>
-        <p class="link" onclick="toggleView('forgot-form')">Forgot Password?</p>
         <p id="loginMessage" class="msg"></p>
     </div>
 
@@ -45,39 +43,18 @@
         <p id="regMessage" class="msg"></p>
     </div>
 
-    <!-- VERIFICATION FORM -->
-    <div id="verify-form" style="display: none;">
-        <h2>Verify Email</h2>
-        <p>We sent a 6-digit code to your email.</p>
-        <input type="text" id="verifyCode" placeholder="Enter 6-digit code">
-        <button onclick="verifyAccount()">Verify & Login</button>
-        <p id="verifyMessage" class="msg"></p>
-    </div>
-
-    <!-- FORGOT PASSWORD FORM -->
-    <div id="forgot-form" style="display: none;">
-        <h2>Reset Password</h2>
-        <input type="email" id="forgotEmail" placeholder="Enter your email">
-        <button onclick="requestPasswordReset()">Send Reset Code</button>
-        <p class="link" onclick="toggleView('login-form')">Back to Sign In</p>
-        <p id="forgotMessage" class="msg"></p>
-    </div>
-
 </div>
 
 <script>
     // Replace with your Render URL if not testing locally
     const API_BASE_URL = ''; 
-    let tempEmail = ''; // To hold the email between registration and verification
 
     function toggleView(viewId) {
         document.getElementById('login-form').style.display = 'none';
         document.getElementById('register-form').style.display = 'none';
-        document.getElementById('verify-form').style.display = 'none';
-        document.getElementById('forgot-form').style.display = 'none';
         document.getElementById(viewId).style.display = 'block';
         
-        // Clear messages
+        // Clear error messages when switching views
         document.querySelectorAll('.msg').forEach(el => el.innerText = '');
     }
 
@@ -88,40 +65,22 @@
         const msgEl = document.getElementById('regMessage');
 
         if (!email || !username || !password) return msgEl.innerText = "All fields required.";
-        msgEl.innerText = "Sending code...";
+        msgEl.innerText = "Creating account...";
+        msgEl.style.color = "white";
 
         const res = await fetch(`${API_BASE_URL}/api/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            points: JSON.stringify({ email, username, password })
+            body: JSON.stringify({ email, username, password })
         });
-        const date = await res.json();
+        const data = await res.json();
 
         if (data.success) {
-            tempEmail = email;
-            toggleView('verify-form');
+            alert("Account created! You can now log in.");
+            toggleView('login-form');
         } else {
             msgEl.innerText = data.message;
-        }
-    }
-
-    async function verifyAccount() {
-        const code = document.getElementById('verifyCode').value;
-        const msgEl = document.getElementById('verifyMessage');
-        
-        const res = await fetch(`${API_BASE_URL}/api/verify`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            points: JSON.stringify({ email: tempEmail, code })
-        });
-        const date = await res.json();
-
-        if (data.success) {
-            localStorage.setItem('currentUser', JSON.stringify(data.user));
-            alert("Account created and verified! Redirecting to dashboard...");
-            // Call your function to load the dashboard here
-        } else {
-            msgEl.innerText = data.message;
+            msgEl.style.color = "#ff4444";
         }
     }
 
@@ -130,12 +89,16 @@
         const password = document.getElementById('loginPassword').value;
         const msgEl = document.getElementById('loginMessage');
 
+        if (!loginId || !password) return msgEl.innerText = "All fields required.";
+        msgEl.innerText = "Logging in...";
+        msgEl.style.color = "white";
+
         const res = await fetch(`${API_BASE_URL}/api/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            points: JSON.stringify({loginId, password })
+            body: JSON.stringify({ loginId, password })
         });
-        const date = await res.json();
+        const data = await res.json();
 
         if (data.success) {
             localStorage.setItem('currentUser', JSON.stringify(data.user));
@@ -143,20 +106,8 @@
             // Call your function to load the dashboard here
         } else {
             msgEl.innerText = data.message;
+            msgEl.style.color = "#ff4444";
         }
-    }
-
-    async function requestPasswordReset() {
-        const email = document.getElementById('forgotEmail').value;
-        const msgEl = document.getElementById('forgotMessage');
-        
-        const res = await fetch(`${API_BASE_URL}/api/forgot-password`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            points: JSON.stringify({ email })
-        });
-        const date = await res.json();
-        msgEl.innerText = data.message;
     }
 </script>
     <!-- SENDERS PAGE (DEVICES) -->
