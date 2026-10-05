@@ -20,103 +20,32 @@
         </div>
     </header>
 
-   <div id="auth-container" class="auth-card">
-    
-    <!-- LOGIN FORM -->
-    <div id="login-form">
-        <h2>Sign In</h2>
-        <input type="text" id="loginId" placeholder="Email or Username">
-        <input type="password" id="loginPassword" placeholder="Password">
-        <button onclick="login()">Login</button>
-        <p class="link" onclick="toggleView('register-form')">Don't have an account? Create one</p>
-        <p id="loginMessage" class="msg"></p>
-    </div>
-
-    <!-- REGISTER FORM -->
-    <div id="register-form" style="display: none;">
-        <h2>Create Account</h2>
-        <input type="email" id="regEmail" placeholder="Email">
-        <input type="text" id="regUsername" placeholder="Username">
-        <input type="password" id="regPassword" placeholder="Password">
-        <button onclick="register()">Create Account</button>
-        <p class="link" onclick="toggleView('login-form')">Already have an account? Sign in</p>
-        <p id="regMessage" class="msg"></p>
-    </div>
-
-</div>
-
-<script>
-    // Replace with your Render URL if not testing locally
-    const API_BASE_URL = ''; 
-
-    function toggleView(viewId) {
-        document.getElementById('login-form').style.display = 'none';
-        document.getElementById('register-form').style.display = 'none';
-        document.getElementById(viewId).style.display = 'block';
+    <!-- AUTHENTICATION CONTAINER -->
+    <div id="auth-container" class="auth-card">
         
-        // Clear error messages when switching views
-        document.querySelectorAll('.msg').forEach(el => el.innerText = '');
-    }
+        <!-- LOGIN FORM -->
+        <div id="login-form">
+            <h2 data-i18n="signInTitle">Sign In</h2>
+            <input type="text" id="loginId" data-i18n-ph="loginIdPh" placeholder="Email or Username" required><br>
+            <input type="password" id="loginPassword" data-i18n-ph="passPh" placeholder="Password" required><br>
+            <button class="authBtn" onclick="login()" data-i18n="loginBtn">Login</button>
+            <p class="toggle-text"><span onclick="toggleView('register-form')" data-i18n="noAccountBtn">Don't have an account? Create one</span></p>
+            <p id="loginMessage" class="error-text" style="display: none;"></p>
+        </div>
 
-    async function register() {
-        const email = document.getElementById('regEmail').value;
-        const username = document.getElementById('regUsername').value;
-        const password = document.getElementById('regPassword').value;
-        const msgEl = document.getElementById('regMessage');
+        <!-- REGISTER FORM -->
+        <div id="register-form" style="display: none;">
+            <h2 data-i18n="registerTitle">Create Account</h2>
+            <input type="email" id="regEmail" data-i18n-ph="emailPh" placeholder="Email" required><br>
+            <input type="text" id="regUsername" data-i18n-ph="usernamePh" placeholder="Username" required><br>
+            <input type="password" id="regPassword" data-i18n-ph="passPh" placeholder="Password" required><br>
+            <button class="authBtn" onclick="register()" data-i18n="createAccBtn">Create Account</button>
+            <p class="toggle-text"><span onclick="toggleView('login-form')" data-i18n="hasAccountBtn">Already have an account? Sign in</span></p>
+            <p id="regMessage" class="error-text" style="display: none;"></p>
+        </div>
 
-        if (!email || !username || !password) return msgEl.innerText = "All fields required.";
-        msgEl.innerText = "Creating account...";
-        msgEl.style.color = "white";
+    </div>
 
-        const res = await fetch(`${API_BASE_URL}/api/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, username, password })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            alert("Account created! You can now log in.");
-            toggleView('login-form');
-        } else {
-            msgEl.innerText = data.message;
-            msgEl.style.color = "#ff4444";
-        }
-    }
-
-    async function login() {
-        const loginId = document.getElementById('loginId').value;
-        const password = document.getElementById('loginPassword').value;
-        const msgEl = document.getElementById('loginMessage');
-
-        if (!loginId || !password) return msgEl.innerText = "All fields required.";
-        msgEl.innerText = "Logging in...";
-        msgEl.style.color = "white";
-
-        const res = await fetch(`${API_BASE_URL}/api/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ loginId, password })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            localStorage.setItem('currentUser', JSON.stringify(data.user));
-            alert("Login successful!");
-            
-            // 1. Hide the entire authentication container
-            document.getElementById('auth-container').style.display = 'none';
-            
-            // 2. Show your main website content/dashboard
-            // IMPORTANT: Replace 'your-dashboard-id' with the actual ID of your main content div
-            document.getElementById('your-dashboard-id').style.display = 'block'; 
-            
-        } else {
-            msgEl.innerText = data.message;
-            msgEl.style.color = "#ff4444";
-        }
-    }
-</script>
     <!-- SENDERS PAGE (DEVICES) -->
     <div id="sendersSection" style="display: none;">
         <button class="scan-plus-btn" onclick="startScanner('sender')" title="Add Sender Device">+</button>
@@ -149,10 +78,15 @@
             en: {
                 langToggle: "🌐 عربي",
                 signInTitle: "Sign In",
+                registerTitle: "Create Account",
+                loginIdPh: "Email or Username",
                 emailPh: "Email",
+                usernamePh: "Username",
                 passPh: "Password",
                 loginBtn: "Login",
-                invalidCreds: "Invalid credentials!",
+                createAccBtn: "Create Account",
+                noAccountBtn: "Don't have an account? Create one",
+                hasAccountBtn: "Already have an account? Sign in",
                 signOut: "Sign Out",
                 mySendersTitle: "My Devices (Senders)",
                 backToSenders: "← Back to Devices",
@@ -166,15 +100,20 @@
                 nameReceiverModalTitle: "Name Your Receiver Device",
                 saveBtn: "Save",
                 cancelBtn: "Cancel",
-                invalidQr: "Invalid QR code format. Please scan a valid device QR code."
+                invalidQr: "Invalid QR code format."
             },
             ar: {
                 langToggle: "🌐 English",
                 signInTitle: "تسجيل الدخول",
+                registerTitle: "إنشاء حساب",
+                loginIdPh: "البريد الإلكتروني أو اسم المستخدم",
                 emailPh: "البريد الإلكتروني",
+                usernamePh: "اسم المستخدم",
                 passPh: "كلمة المرور",
                 loginBtn: "دخول",
-                invalidCreds: "بيانات الاعتماد غير صالحة!",
+                createAccBtn: "إنشاء حساب",
+                noAccountBtn: "ليس لديك حساب؟ أنشئ حساباً",
+                hasAccountBtn: "لديك حساب بالفعل؟ سجل الدخول",
                 signOut: "تسجيل الخروج",
                 mySendersTitle: "أجهزتي (أجهزة الإرسال)",
                 backToSenders: "العودة للأجهزة →",
@@ -188,7 +127,7 @@
                 nameReceiverModalTitle: "تسمية جهاز الاستقبال",
                 saveBtn: "حفظ",
                 cancelBtn: "إلغاء",
-                invalidQr: "صيغة رمز QR غير صالحة. يرجى مسح رمز صحيح."
+                invalidQr: "صيغة رمز QR غير صالحة."
             }
         };
 
@@ -235,7 +174,7 @@
         let isHoldTriggered = false;
         let ignoreMouse = false;
 
-        const loginSection = document.getElementById("loginSection");
+        const authContainer = document.getElementById("auth-container");
         const sendersSection = document.getElementById("sendersSection");
         const receiversSection = document.getElementById("receiversSection");
         const logoutBtn = document.getElementById("logoutBtn");
@@ -249,33 +188,79 @@
             }
         });
 
-        document.getElementById("loginForm").addEventListener("submit", async function(e) {
-            e.preventDefault();
-            const email = document.getElementById("loginEmail").value.trim().toLowerCase();
+        function toggleView(viewId) {
+            document.getElementById("login-form").style.display = "none";
+            document.getElementById("register-form").style.display = "none";
+            document.getElementById(viewId).style.display = "block";
+            document.getElementById("loginMessage").style.display = "none";
+            document.getElementById("regMessage").style.display = "none";
+        }
+
+        async function register() {
+            const email = document.getElementById("regEmail").value.trim();
+            const username = document.getElementById("regUsername").value.trim();
+            const password = document.getElementById("regPassword").value;
+            const msgEl = document.getElementById("regMessage");
+
+            if (!email || !username || !password) {
+                msgEl.innerText = "All fields required.";
+                msgEl.style.display = "block";
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/register`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, username, password })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert("Account created! Please sign in.");
+                    toggleView("login-form");
+                } else {
+                    msgEl.innerText = data.message;
+                    msgEl.style.display = "block";
+                }
+            } catch (e) {
+                msgEl.innerText = "Error connecting to server.";
+                msgEl.style.display = "block";
+            }
+        }
+
+        async function login() {
+            const loginId = document.getElementById("loginId").value.trim();
             const password = document.getElementById("loginPassword").value;
-            const errorMsg = document.getElementById("loginErrorMsg");
+            const msgEl = document.getElementById("loginMessage");
+
+            if (!loginId || !password) {
+                msgEl.innerText = "All fields required.";
+                msgEl.style.display = "block";
+                return;
+            }
 
             try {
                 const res = await fetch(`${API_URL}/login`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
+                    body: JSON.stringify({ loginId, password })
                 });
                 const data = await res.json();
                 if (data.success) {
                     activeAccount = data.user;
                     localStorage.setItem("activeEspUser", JSON.stringify(activeAccount));
-                    errorMsg.style.display = "none";
+                    msgEl.style.display = "none";
                     openDashboard();
                 } else {
-                    errorMsg.innerText = data.message; errorMsg.style.display = "block";
+                    msgEl.innerText = data.message;
+                    msgEl.style.display = "block";
                 }
-            } catch (err) {
-                errorMsg.innerText = "Cannot connect to server!"; errorMsg.style.display = "block";
+            } catch (e) {
+                msgEl.innerText = "Cannot connect to server!";
+                msgEl.style.display = "block";
             }
-        });
+        }
 
         function openDashboard() {
-            loginSection.style.display = "none";
+            authContainer.style.display = "none";
             receiversSection.style.display = "none";
             sendersSection.style.display = "flex";
             logoutBtn.style.display = "block";
@@ -466,8 +451,8 @@
             sendersSection.style.display = "none";
             receiversSection.style.display = "none";
             logoutBtn.style.display = "none";
-            loginSection.style.display = "flex";
-            document.getElementById("loginForm").reset();
+            authContainer.style.display = "flex";
+            toggleView("login-form");
         }
 
         function startScanner(mode) {
