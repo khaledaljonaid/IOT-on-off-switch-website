@@ -47,8 +47,7 @@ function saveUsers(users) {
     }
 }
 
-// 1. CLIENT LOGIN / AUTO-REGISTER
-//1ST REGISTER NEW ACCOUNT
+// 1. REGISTER NEW ACCOUNT
 app.post('/api/register', async (req, res) => {
     const { email, username, password } = req.body;
     let users = loadUsers();
@@ -59,93 +58,49 @@ app.post('/api/register', async (req, res) => {
         return res.status(400).json({ success: false, message: "Email or Username already exists." });
     }
 
-    const code = generateCode();
-    
-    // Save user as unverified
+    // Save user directly to database
     const newUser = { 
         email: normalizedEmail, 
         username: username,
         password: password, 
-        isVerified: false,
-        verificationCode: code,
         senders: [] 
     };
     users.push(newUser);
     saveUsers(users);
 
-    try {
-        await transporter.sendMail({
-            from: process.env.EMAIL_USER,
-            to: normalizedEmail,
-            subject: 'Verify your KAD Account',
-            text: `Your verification code is: ${code}`
-        });
-        res.json({ success: true, message: "Verification code sent." });
-    } catch (err) {
-        res.status(500).json({ success: false, message: "Failed to send email." });
-    }
+    res.json({ success: true, message: "Account created successfully." });
 });
 
-// 2. VERIFY ACCOUNT
-app.post('/api/verify', (req, res) => {
-    const { email, code } = req.body;
-    let users = loadUsers();
-    let user = users.find(u => u.email === email.toLowerCase().trim());
-
-    if (!user || user.verificationCode!== code) {
-        return res.status(400).json({ success: false, message: "Invalid code." });
-    }
-
-    user.isVerified = true;
-    user.verificationCode = null; // Clear code
-    saveUsers(users);
-
-    res.json({ success: true, user: { email: user.email, username: user.username, senders: user.senders } });
-});
-
-// 3. LOGIN (Supports Email OR Username)
+// 2. LOGIN (Supports Email OR Username)
 app.post('/api/login', (req, res) => {
-    const { loginId, password } = req.body; // loginId can be email or username
+    const { loginId, password } = req.body; 
     const users = loadUsers();
     const normalizedId = loginId.toLowerCase().trim();
 
+    // Find user by email OR username
     const user = users.find(u => 
         u.email === normalizedId || 
         (u.username && u.username.toLowerCase() === normalizedId)
     );
 
-    if (!user) return res.status(404).json({ success: false, message: "User not found." });
-    if (!user.isVerified) return res.status(403).json({ success: false, message: "Account not verified." });
-    if (user.password!== password) return res.status(401).json({ success: false, message: "Incorrect password." });
-
-    res.json({ success: true, user: { email: user.email, username: user.username, senders: user.senders } });
-});
-
-// 4. FORGOT PASSWORD
-app.post('/api/forgot-password', async (req, res) => {
-    const { email } = req.body;
-    let users = loadUsers();
-    let user = users.find(u => u.email === email.toLowerCase().trim());
-
-    if (!user) return res.status(404).json({ success: false, message: "Email not found." });
-
-    const code = generateCode();
-    user.resetCode = code; // Create a temporary password/code
-    saveUsers(users);
-
-    try {
-        await transporter.sendMail({
-            from: process.env.EMAIL_USER,
-            to: user.email,
-            subject: 'Password Reset',
-            text: `Your temporary login code to reset your password is: ${code}`
-        });
-        res.json({ success: true, message: "Reset instructions sent to email." });
-    } catch (err) {
-        res.status(500).json({ success: false, message: "Failed to send email." });
+    if (!user) {
+        return res.status(404).json({ success: false, message: "User not found." });
     }
-});
+    
+    if (user.password !== password) {
+        return res.status(401).json({ success: false, message: "Incorrect password." });
+    }
 
+    // Login successful
+    res.json({ 
+        success: true, 
+        user: { 
+            email: user.email, 
+            username: user.username, 
+            senders: user.senders 
+        } 
+    });
+});
 // 2. ADD SENDER DEVICE
 app.post('/api/add-sender', (req, res) => {
     const { email, senderId, name } = req.body;
