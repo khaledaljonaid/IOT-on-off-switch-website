@@ -103,7 +103,14 @@
         if (data.success) {
             localStorage.setItem('currentUser', JSON.stringify(data.user));
             alert("Login successful!");
-            // Call your function to load the dashboard here
+            
+            // 1. Hide the entire authentication container
+            document.getElementById('auth-container').style.display = 'none';
+            
+            // 2. Show your main website content/dashboard
+            // IMPORTANT: Replace 'your-dashboard-id' with the actual ID of your main content div
+            document.getElementById('your-dashboard-id').style.display = 'block'; 
+            
         } else {
             msgEl.innerText = data.message;
             msgEl.style.color = "#ff4444";
