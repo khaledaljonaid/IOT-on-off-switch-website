@@ -163,4 +163,42 @@ input {
     color: #ff4444;
 }
 
+/* --- STRICT CENTERING FOR AUTH FORMS --- */
+
+#login-form, #register-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;  /* Centers the input boxes and buttons inside the card */
+    text-align: center;   /* Centers the text inside the elements */
+    width: 100%;
+}
+
+#login-form h2, #register-form h2 {
+    text-align: center;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+#login-form input, #register-form input {
+    width: 100%;
+    box-sizing: border-box;
+    /* Optional: Uncomment the line below if you also want the typing text INSIDE the inputs to be centered */
+    /* text-align: center; */ 
+}
+
+#login-form button, #register-form button {
+    display: flex;
+    justify-content: center; /* Forces the text like "Login" or "دخول" to be dead-center */
+    align-items: center;
+    text-align: center;
+    width: 100%;
+    margin: 10px auto;
+}
+
+.toggle-text, .error-text {
+    text-align: center;
+    width: 100%;
+    display: block;
+}
+
 @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
