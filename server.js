@@ -20,16 +20,9 @@ function loadUsers() {
     try {
         const data = fs.readFileSync(DATA_FILE, 'utf8');
         let parsedData = JSON.parse(data || '[]');
-        
-        // Fix for old { "users": [] } format to prevent .find() crash
         if (parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData)) {
-            if (Array.isArray(parsedData.users)) {
-                parsedData = parsedData.users;
-            } else {
-                parsedData = []; 
-            }
+            parsedData = Array.isArray(parsedData.users) ? parsedData.users : [];
         }
-        
         return Array.isArray(parsedData) ? parsedData : [];
     } catch (err) {
         console.error("Error reading users.json:", err);
@@ -47,61 +40,70 @@ function saveUsers(users) {
     }
 }
 
-// 1. REGISTER NEW ACCOUNT
-app.post('/api/register', async (req, res) => {
+// 1. REGISTER NEW USER
+app.post('/api/register', (req, res) => {
     const { email, username, password } = req.body;
+    if (!email || !username || !password) {
+        return res.status(400).json({ success: false, message: "All fields are required." });
+    }
+
     let users = loadUsers();
     const normalizedEmail = email.toLowerCase().trim();
-    
-    // Check if user already exists
-    if (users.find(u => u.email === normalizedEmail || u.username === username)) {
+    const normalizedUsername = username.toLowerCase().trim();
+
+    if (users.some(u => u.email.toLowerCase() === normalizedEmail || (u.username && u.username.toLowerCase() === normalizedUsername))) {
         return res.status(400).json({ success: false, message: "Email or Username already exists." });
     }
 
-    // Save user directly to database
-    const newUser = { 
-        email: normalizedEmail, 
+    const newUser = {
+        email: normalizedEmail,
         username: username,
-        password: password, 
-        senders: [] 
+        password: password,
+        senders: []
     };
-    users.push(newUser);
-    saveUsers(users);
 
-    res.json({ success: true, message: "Account created successfully." });
+    users.push(newUser);
+    if (saveUsers(users)) {
+        return res.json({ success: true, message: "Account created successfully." });
+    } else {
+        return res.status(500).json({ success: false, message: "Failed to create account." });
+    }
 });
 
-// 2. LOGIN (Supports Email OR Username)
+// 2. CLIENT LOGIN (Email or Username)
 app.post('/api/login', (req, res) => {
-    const { loginId, password } = req.body; 
+    const { loginId, password } = req.body;
+    if (!loginId || !password) {
+        return res.status(400).json({ success: false, message: "Login ID and password are required." });
+    }
+
     const users = loadUsers();
     const normalizedId = loginId.toLowerCase().trim();
 
-    // Find user by email OR username
     const user = users.find(u => 
-        u.email === normalizedId || 
+        u.email.toLowerCase() === normalizedId || 
         (u.username && u.username.toLowerCase() === normalizedId)
     );
 
     if (!user) {
         return res.status(404).json({ success: false, message: "User not found." });
     }
-    
+
     if (user.password !== password) {
         return res.status(401).json({ success: false, message: "Incorrect password." });
     }
 
-    // Login successful
-    res.json({ 
-        success: true, 
-        user: { 
-            email: user.email, 
-            username: user.username, 
-            senders: user.senders 
-        } 
+    return res.json({
+        success: true,
+        user: {
+            email: user.email,
+            username: user.username,
+            senders: user.senders || []
+        }
     });
 });
-// 2. ADD SENDER DEVICE
+
+// 3. ADD SENDER DEVICE
 app.post('/api/add-sender', (req, res) => {
     const { email, senderId, name } = req.body;
     if (!email || !senderId || !name) {
@@ -129,7 +131,7 @@ app.post('/api/add-sender', (req, res) => {
     }
 });
 
-// 3. DELETE SENDER DEVICE
+// 4. DELETE SENDER DEVICE
 app.post('/api/delete-sender', (req, res) => {
     const { email, senderId } = req.body;
     let users = loadUsers();
@@ -147,7 +149,7 @@ app.post('/api/delete-sender', (req, res) => {
     }
 });
 
-// 4. ADD RECEIVER TO SENDER
+// 5. ADD RECEIVER TO SENDER
 app.post('/api/add-receiver', (req, res) => {
     const { email, senderId, mac, name } = req.body;
     if (!email || !senderId || !mac || !name) {
@@ -184,7 +186,7 @@ app.post('/api/add-receiver', (req, res) => {
     }
 });
 
-// 5. DELETE RECEIVER FROM SENDER
+// 6. DELETE RECEIVER FROM SENDER
 app.post('/api/delete-receiver', (req, res) => {
     const { email, senderId, receiverId } = req.body;
     let users = loadUsers();
